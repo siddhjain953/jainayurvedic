@@ -95,8 +95,6 @@ class CustomerApp {
                     this.isOffline = false;
                     const badge = document.getElementById('offline-badge');
                     if (badge) badge.remove();
-                    // Optional: Refresh data
-                    // this.render(); 
                 }
             } else {
                 throw new Error('Offline');

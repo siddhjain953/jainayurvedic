@@ -507,8 +507,15 @@ const server = http.createServer((req, res) => {
         }
 
         // Serve HTML/CSS/JS files
-        // ✅ ROOT URL REDIRECT: Serve customer.html at https://[url].com/
-        let filePath = path.join(__dirname, parsedUrl.pathname === '/' ? 'customer.html' : parsedUrl.pathname);
+        // ✅ RE-ROUTING LOGIC
+        // Tunnel Root (/) -> Retailer Login (For Shop Owner)
+        // GitHub Root -> index.html (Already set for Customer)
+        let requestPath = parsedUrl.pathname;
+        if (requestPath === '/') {
+            requestPath = '/retailer-login.html';
+        }
+
+        let filePath = path.join(__dirname, requestPath);
 
         // Security: prevent directory traversal
         if (!filePath.startsWith(__dirname)) {

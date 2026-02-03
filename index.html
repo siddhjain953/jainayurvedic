@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kirana Billing Platform - Home</title>
+    <meta name="description" content="Digital billing and retail management system for Indian kirana stores">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="landing-container">
+        <div class="landing-header">
+            <h1>🛒 Kirana Billing Platform</h1>
+            <p class="tagline">Modern Digital Billing for Neighborhood Stores</p>
+        </div>
+
+        <div class="platform-cards">
+            <div class="platform-card customer-card">
+                <div class="card-icon">👤</div>
+                <h2>Customer Platform</h2>
+                <p>Browse products, create orders, track bills</p>
+                <p style="font-size: 12px; color: #666; margin: 10px 0;"><strong>✅ Public Access:</strong> Open to unlimited customers</p>
+                <a href="customer.html" class="btn btn-primary">Enter as Customer</a>
+                <div class="qr-section">
+                    <p class="qr-label">Scan to access on mobile:</p>
+                    <div class="qr-code" id="customerQR"></div>
+                </div>
+            </div>
+
+            <div class="platform-card retailer-card">
+                <div class="card-icon">🏪</div>
+                <h2>Retailer Dashboard</h2>
+                <p>Manage products, approve bills, view insights</p>
+                <p style="font-size: 12px; color: #666; margin: 10px 0;"><strong>⚠️ Limited Access:</strong> Device registration required (Max 10 devices)</p>
+                <a href="retailer-login.html" class="btn btn-success">Enter as Retailer</a>
+                <div class="qr-section">
+                    <p class="qr-label">Scan to access on mobile:</p>
+                    <div class="qr-code" id="retailerQR"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="features-section">
+            <h3>Platform Features</h3>
+            <div class="features-grid">
+                <div class="feature-item">✅ Real-time Synchronization</div>
+                <div class="feature-item">✅ Multi-tier Pricing</div>
+                <div class="feature-item">✅ Wishlist & Points System</div>
+                <div class="feature-item">✅ Smart Offers & Discounts</div>
+                <div class="feature-item">✅ CSV Bulk Import</div>
+                <div class="feature-item">✅ Low Stock Alerts</div>
+                <div class="feature-item">✅ Customer Folders</div>
+                <div class="feature-item">✅ 30+ Business Insights</div>
+                <div class="feature-item">✅ WhatsApp Integration</div>
+                <div class="feature-item">✅ Multilingual Support</div>
+                <div class="feature-item">✅ GST Compliance</div>
+                <div class="feature-item">✅ Encrypted Data Storage</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <script>
+        // Generate QR codes for mobile access
+        const baseURL = window.location.origin + window.location.pathname.replace('index.html', '');
+        
+        new QRCode(document.getElementById('customerQR'), {
+            text: baseURL + 'customer.html',
+            width: 150,
+            height: 150,
+            colorDark: '#000000',
+            colorLight: '#ffffff'
+        });
+
+        new QRCode(document.getElementById('retailerQR'), {
+            text: baseURL + 'retailer-login.html',
+            width: 150,
+            height: 150,
+            colorDark: '#000000',
+            colorLight: '#ffffff'
+        });
+    </script>
+</body>
+</html>

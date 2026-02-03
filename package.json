@@ -1,0 +1,13 @@
+{
+  "name": "kirana-billing-platform",
+  "version": "1.0.0",
+  "description": "Device-wide data storage for Kirana Billing Platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["kirana", "billing", "retail"],
+  "author": "",
+  "license": "MIT"
+}

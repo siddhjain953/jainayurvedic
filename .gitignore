@@ -1,0 +1,12 @@
+# Sensitive local data (NEVER PUSH TO PUBLIC)
+data.json
+secret.key
+node_modules/
+.DS_Store
+
+# Allow encrypted data
+!data.enc
+
+# Local Scripts/Logs
+*.log
+.env

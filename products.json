@@ -1,0 +1,30 @@
+[
+  {
+    "id": "P001",
+    "name": "Tata Salt (1kg)",
+    "category": "Groceries",
+    "brand": "Tata",
+    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Tata+Salt"
+  },
+  {
+    "id": "P002",
+    "name": "Amul Butter (500gm)",
+    "category": "Dairy",
+    "brand": "Amul",
+    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Amul+Butter"
+  },
+  {
+    "id": "P003",
+    "name": "Maggi Noodles (70gm)",
+    "category": "Instant Food",
+    "brand": "Maggi",
+    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Maggi"
+  },
+  {
+    "id": "P004",
+    "name": "Parle-G Biscuits (250gm)",
+    "category": "Snacks",
+    "brand": "Parle",
+    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Parle-G"
+  }
+]

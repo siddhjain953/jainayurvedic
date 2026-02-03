@@ -24,7 +24,7 @@ echo ========================================
 echo.
 
 :: Start anonymous tunnel
-cloudflared.exe tunnel --url http://localhost:8000
+.\cloudflared.exe tunnel --url http://localhost:8000
 
 :: Cleanup when tunnel stops
 echo.

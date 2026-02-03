@@ -59,56 +59,71 @@ class CustomerApp {
 
     async checkConnection() {
         try {
-            // Try to fetch a lightweight resource
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            // 1. Fetch Dynamic Backend URL
+            // We use a timestamp to prevent caching
+            const configResponse = await fetch('api_config.json?t=' + new Date().getTime());
 
-            const response = await fetch('/api/shop', {
-                method: 'GET',
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-
-            if (response.ok) {
-                // We are ONLINE
-                const offlineBadge = document.getElementById('offline-warning-badge');
-                if (offlineBadge) offlineBadge.remove();
-            } else {
-                throw new Error('Server returned error');
-            }
-        } catch (error) {
-            // We are OFFLINE
-            console.log('Connection Lost. Switching to Offline Mode...');
-            this.isOffline = true;
-
-            // Show Offline Badge
-            if (!document.getElementById('offline-badge')) {
-                const badge = document.createElement('div');
-                badge.id = 'offline-badge';
-                badge.innerHTML = `⚠️ Offline Mode (WhatsApp Ordering Only)`;
-                badge.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#ff9800;color:black;text-align:center;padding:5px;z-index:9999;font-weight:bold;font-size:12px;';
-                document.body.prepend(badge);
-            }
-
-            // Try to load static menu if not loaded
-            if (this.allProducts.length === 0) {
-                this.loadStaticMenu();
-            }
-
-
-            if (settings && settings.offlineBackupUrl) {
-                // AUTO-SWITCH
-                window.location.href = settings.offlineBackupUrl;
-            } else {
-                // Show Warning if no backup URL configured
-                if (!document.getElementById('offline-warning-badge')) {
-                    const badge = document.createElement('div');
-                    badge.id = 'offline-warning-badge';
-                    badge.innerHTML = `⚠️ Connection Lost. <button onclick="location.reload()">Retry</button>`;
-                    badge.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#ff5722;color:white;text-align:center;padding:10px;z-index:9999;font-weight:bold;';
-                    document.body.prepend(badge);
+            if (configResponse.ok) {
+                const config = await configResponse.json();
+                if (window.dataManager && config.apiUrl) {
+                    window.dataManager.apiBase = config.apiUrl + '/api';
                 }
             }
+
+            // 2. Ping the Backend (if we have a URL)
+            let isOnline = false;
+            if (window.dataManager && window.dataManager.apiBase) {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000); // Short timeout
+
+                try {
+                    const response = await fetch(window.dataManager.apiBase + '/shop', {
+                        method: 'GET',
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+                    if (response.ok) isOnline = true;
+                } catch (e) {
+                    // Fetch failed, still offline
+                }
+            }
+
+            if (isOnline) {
+                // WE ARE ONLINE
+                if (this.isOffline) {
+                    console.log('🟢 Connection Restored');
+                    this.isOffline = false;
+                    const badge = document.getElementById('offline-badge');
+                    if (badge) badge.remove();
+                    // Optional: Refresh data
+                    // this.render(); 
+                }
+            } else {
+                throw new Error('Offline');
+            }
+
+        } catch (error) {
+            // WE ARE OFFLINE
+            if (!this.isOffline) {
+                console.log('🔴 Connection Lost. Switching to Offline Mode.');
+                this.isOffline = true;
+                this.showOfflineBadge();
+
+                // CRITICAL: DO NOT REDIRECT. JUST LOAD STATIC DATA.
+                if (!this.allProducts || this.allProducts.length === 0) {
+                    this.loadStaticMenu();
+                }
+            }
+        }
+    }
+
+    showOfflineBadge() {
+        if (!document.getElementById('offline-badge')) {
+            const badge = document.createElement('div');
+            badge.id = 'offline-badge';
+            badge.innerHTML = `⚠️ <b>OFFLINE MODE</b>: You can still browse and order via WhatsApp.`;
+            badge.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#ff9800;color:black;text-align:center;padding:10px;z-index:9999;font-weight:bold;font-size:14px;box-shadow:0 2px 5px rgba(0,0,0,0.2);';
+            document.body.prepend(badge);
         }
     }
 

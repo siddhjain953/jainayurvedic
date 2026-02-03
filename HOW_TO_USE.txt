@@ -1,0 +1,35 @@
+PLEASE READ THIS - SIMPLE INSTRUCTIONS
+
+I have set up everything for you. You do not need to code.
+You do not need to log in. I have added your Key.
+
+===============================================
+MORNING ROUTINE (When you open the shop)
+===============================================
+1. Go to your Desktop (or folder).
+2. Double-Click "START_TODAY.bat".
+3. A black window will open. DO NOT CLOSE IT.
+   -> It starts the website server.
+   -> It connects to the internet.
+   -> It automatically sends the new link to your customers.
+
+**Your Shop is now LIVE.**
+
+===============================================
+EVENING ROUTINE (Before you sleep)
+===============================================
+1. Double-Click "PUBLISH_SHOP.bat".
+2. Wait for it to finish (it says "SYNC COMPLETE").
+3. Close the window.
+
+**What this does:**
+- Compresses your images (to save space).
+- Encrypts your customer data (for safety).
+- Updates the menu prices online.
+- Backs up everything to your Private Vault.
+
+===============================================
+THAT IS IT!
+===============================================
+- Customer Link (Always Same): https://siddhjain953.github.io/jainayurvedic/
+- Retailer Link: Use the one shown in the "START_TODAY" window.

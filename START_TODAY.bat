@@ -1,40 +1,50 @@
 @echo off
-title Get Today's Shop Link - Kirana Platform
-color 0E
+cd /d "%~dp0"
+title START SHOP (Server + Tunnel) 🚀
+color 0A
 
 echo ===================================================
-echo      GETTING YOUR SHOP LINK FOR TODAY...
+echo      STARTING YOUR INTELLIGENT SHOP...
 echo ===================================================
 echo.
 
-:: 1. Cleanup old processes to prevent conflicts
-echo [1/3] Cleaning up old connections...
+:: 1. Cleanup Old Processes
+echo [1/3] Cleaning up old processes...
 taskkill /F /IM node.exe >nul 2>&1
 taskkill /F /IM cloudflared.exe >nul 2>&1
+if exist tunnel.log del tunnel.log
+if exist server.log del server.log
 
-:: 2. Start Server
-echo [2/3] Starting Shop Server...
-start "Kirana Server" /MIN node server.js
+:: 2. Start Server (Visible Window for Debugging)
+echo [2/3] Starting Local Server...
+echo      (Check server.log if this fails)
+start "Kirana Server" cmd /k "node server.js > server.log 2>&1"
+timeout /t 5 /nobreak >nul
+
+:: 3. Start Cloudflare Tunnel
+echo [3/3] Connecting to Cloudflare...
+start "Cloudflare Tunnel" /MIN cmd /c "npx -y cloudflared tunnel --url http://localhost:8000 > tunnel.log 2>&1"
+
+:: 4. Sync Mechanism
+echo.
+echo [4/4] Waiting for Tunnel & Syncing Link...
+echo      (Please wait 15 seconds...)
+
+:loop
 timeout /t 3 /nobreak >nul
-echo ✅ Server Active
+node scripts/update_url.js --log tunnel.log
+if %errorlevel% equ 0 goto success
+goto loop
 
-:: 3. Start Tunnel (This generates the link)
-echo [3/3] Generating New Link...
+:success
 echo.
 echo ===================================================
-echo   LOOK BELOW FOR A LINK ENDING IN .trycloudflare.com
-echo   Example: https://happy-dog-123.trycloudflare.com
+echo      ✅ SHOP IS ONLINE & LINKED!
+echo      - Retailer Config Synced to GitHub.
+echo      - Customer Site Updated.
+echo.
+echo      You can now open: https://siddhjain953.github.io/jainayurvedic/
 echo ===================================================
 echo.
-echo   YOUR CUSTOMER LINK IS THE ROOT URL:
-echo   Accepts: https://[your-link].trycloudflare.com
-echo.
-echo   See your link below...
-echo ===================================================
-echo.
-
-:: Run tunnel
-cloudflared.exe tunnel --url http://localhost:8000
-
-:: Pause if it crashes
+echo DO NOT CLOSE THIS WINDOW.
 pause

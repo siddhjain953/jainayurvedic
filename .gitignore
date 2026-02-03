@@ -1,28 +1,7 @@
-# Sensitive local data (NEVER PUSH TO PUBLIC)
+node_modules/
+tunnel.log
 data.json
 secret.key
-node_modules/
-.DS_Store
-
-# Allow encrypted data
-!data.enc
-
-# Local Scripts/Logs
 *.log
-.env
-START_*.bat
-SETUP_*.bat
-PUBLISH_*.bat
-deploy.bat
-
-# 🔒 RETAILER PRIVACY (Do not upload to Public Cloud)
-# The Retailer Dashboard must NOT be on GitHub Pages.
-# It should only be accessible via the Secure Tunnel.
-retailer.html
-retailer-login.html
-retailer.js
-retailer-extended.js
-retailer.css
-search_debug.html
-authorized_devices.json
-google_credentials.json
+.DS_Store
+vault/

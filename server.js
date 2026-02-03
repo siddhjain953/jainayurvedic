@@ -482,7 +482,7 @@ function startLocalTunnel() {
     });
 }
 // Start tunnel immediately on server launch
-setTimeout(startPermanentTunnel, 1000); // Small delay to let server init
+// setTimeout(startPermanentTunnel, 1000); // DISABLED: We use START_TODAY.bat for external tunnel management
 
 // Create server
 const server = http.createServer((req, res) => {

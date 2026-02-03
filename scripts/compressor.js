@@ -31,26 +31,14 @@ fs.readdir(IMAGES_DIR, (err, files) => {
     }
 
     files.forEach(file => {
-        if (file.match(/\.(jpg|jpeg|png|webp)$/i)) {
+        if (file.match(/\.(jpg|jpeg|png)$/i)) {
             const srcPath = path.join(IMAGES_DIR, file);
-            const stats = fs.statSync(srcPath);
-            const sizeMB = stats.size / (1024 * 1024);
+            const destPath = path.join(PROCESSED_DIR, file);
 
-            // Name it properly for the web
-            const safeName = file.toLowerCase().replace(/\s+/g, '-');
-            const destPath = path.join(PROCESSED_DIR, safeName);
-
-            // LOGIC: If image is HUGE (>2MB), we flag it. 
-            // In a full environment with 'sharp', we would resize here.
-            // For now, we copy it.
-
-            if (sizeMB > 2) {
-                console.log(`⚠️ Large Image Detected: ${file} (${sizeMB.toFixed(2)} MB) - Please resize if possible.`);
-            }
-
-            // Copy to assets folder (Public)
+            // Simple copy for now (Phase 1)
+            // Phase 2 will add the 'sharp' library for actual compression
             fs.copyFileSync(srcPath, destPath);
-            console.log(`✅ Optimized & Linked: ${safeName}`);
+            console.log(`✅ Processed: ${file}`);
         }
     });
 });

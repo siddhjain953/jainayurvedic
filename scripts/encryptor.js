@@ -4,7 +4,7 @@ const path = require('path');
 
 // Configuration
 const DATA_FILE = path.join(__dirname, '../data.json');
-const ENCRYPTED_FILE = path.join(__dirname, '../data.enc');
+const ENCRYPTED_FILE = path.join(__dirname, '../vault/data.enc'); // Save to Vault Repo
 const SECRET_KEY_FILE = path.join(__dirname, '../secret.key');
 
 // Generate or Load Key

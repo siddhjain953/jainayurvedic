@@ -1,40 +1,42 @@
 @echo off
-title Publish Shop to Cloud ☁️
+cd /d "%~dp0"
+title PUBLISH SHOP (Sync & Backup) 🔄
 color 0B
 
 echo ===================================================
-echo      PUBLISHING YOUR SHOP TO GITHUB CLOUD
+echo      EVENING ROUTINE: SYNCING SHOP TO CLOUD
 echo ===================================================
 echo.
 
 :: 1. Compress Images
-echo [1/4] Optimizing Images...
-node scripts/compressor.js
+echo [1/4] Optimizing & Compressing Images...
+call node scripts/compressor.js
 
-:: 2. Encrypt Database (Safety First)
+:: 2. Encrypt Database
 echo [2/4] Encrypting Private Data...
-node scripts/encryptor.js
+call node scripts/encryptor.js
 
 :: 3. Generate Static Menu
-echo [3/4] Updating Cloud Menu...
-:: We will add a simple script to extract public products later
-:: For now, we assume products.json is ready if needed
+echo [3/4] Updating Static Menu...
+call node scripts/publish.js
 
-:: 4. Upload to GitHub
-echo [4/5] Uploading Shop to Public Cloud...
-:: ONLY public files
+:: 4. Push Public Shop
+echo [4/5] Uploading Public Shop...
 git add .
-git commit -m "Shop Update: %date% %time%"
-git push origin main --force
+git commit -m "Shop Sync: %date% %time%"
+git push origin main
 
-echo [5/5] Backing up Encrypted Data to Private Vault...
-:: Note: We use a separate push for the private repo if possible
-:: For now, we push everything (since gitignore protects data.json) to the vault too
-git push vault main --force
+:: 5. Push Private Vault
+echo [5/5] Uploading Private Vault...
+cd vault
+git add .
+git commit -m "Vault Backup: %date% %time%"
+git push origin main
+cd ..
 
 echo.
 echo ===================================================
-echo      ✅ SHOP UPDATE COMPLETE
-echo      Website: https://siddhjain953.github.io/jainayurvedic/
+echo      ✅ SYNC COMPLETE!
+echo      You can now close your laptop.
 echo ===================================================
 pause

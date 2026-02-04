@@ -19,16 +19,36 @@ class DataManager {
         console.log('[DataManager] API Base:', this.apiBase);
 
         this.cache = {
-            products: null,
-            shop: null,
-            customers: null,
-            bills: null,
-            requests: null,
-            offers: null,
-            settings: null
+            products: this.getDefaultProducts(),
+            shop: this.getDefaultShopInfo(),
+            customers: {},
+            bills: [],
+            requests: [],
+            offers: [],
+            settings: this.getDefaultSettings()
         };
-        this.initializeStorage();
+
+        // Load static fallbacks immediately (for GitHub Pages)
+        this.loadStaticFallbacks();
+
+        // Start background sync
         this.startSync();
+    }
+
+    async loadStaticFallbacks() {
+        try {
+            const [products, customers] = await Promise.all([
+                fetch('products.json?t=' + Date.now()).then(r => r.ok ? r.json() : null),
+                fetch('customers.json?t=' + Date.now()).then(r => r.ok ? r.json() : null)
+            ]);
+
+            if (products) this.cache.products = products;
+            if (customers) this.cache.customers = customers;
+
+            this.notifyListeners('sync');
+        } catch (e) {
+            console.warn('[DataManager] Static fallback fetch failed:', e);
+        }
     }
 
     // ============================================

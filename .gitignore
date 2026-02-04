@@ -1,7 +1,16 @@
-node_modules/
+node_modules
+.env
+*.log
 tunnel.log
+server.log
 data.json
 secret.key
-*.log
-.DS_Store
 vault/
+
+# Retailer Platform (Local Only)
+retailer.html
+retailer-login.html
+retailer.js
+retailer-extended.js
+retailer.css
+landing.html

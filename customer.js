@@ -142,7 +142,7 @@ class CustomerApp {
     // AUTHENTICATION
     // ============================================
 
-    handleLogin(name, mobile) {
+    async handleLogin(name, mobile) {
         // Validate Indian mobile number
         const mobileRegex = /^[6-9]\d{9}$/;
         if (!mobileRegex.test(mobile)) {
@@ -155,464 +155,507 @@ class CustomerApp {
             return;
         }
 
-        this.customerName = name.trim();
-        this.customerMobile = mobile.trim();
+        try {
+            // 1. Try to fetch synced customer data from GitHub (customers.json)
+            console.log('🔄 Verifying identity against synced data...');
+            const response = await fetch('customers.json?t=' + new Date().getTime());
 
-        // Save to session
+            if (response.ok) {
+                const customers = await response.json();
+                const existingUser = customers[mobile];
+
+                if (existingUser) {
+                    console.log('✅ Welcome back,', existingUser.name);
+                    this.points = existingUser.points || 0;
+                    this.wishlist = existingUser.wishlist || [];
+                    // Update name if match found, otherwise keep input
+                    this.customerName = existingUser.name;
+                } else {
+                    console.log('🆕 New Customer (Local Session)');
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ Could not verify identity online:', e);
+        }
+
+        // 2. Set Session Logic
+        this.customerName = name;
+        this.customerMobile = mobile;
+
         sessionStorage.setItem('customer', JSON.stringify({
             name: this.customerName,
             mobile: this.customerMobile
         }));
 
-        // Load customer data
-        this.loadCustomerData();
-
+        // 3. Load Store
         this.currentView = 'products';
-        this.render();
-    }
 
-    handleLogout() {
-        sessionStorage.removeItem('customer');
-        this.customerName = '';
-        this.customerMobile = '';
-        this.cart = [];
-        this.wishlist = [];
-        this.points = 0;
-        this.currentView = 'login';
-        this.render();
-    }
-
-    // ============================================
-    // PRODUCT FILTERING & SORTING
-    // ============================================
-
-    getFilteredProducts() {
-        let products = this.isOffline ? (this.allProducts || []) : dataManager.getProducts();
-        const activeOffers = dataManager.getActiveOffers();
-
-        // Apply search filter
-        if (this.filters.search) {
-            const search = this.filters.search.toLowerCase();
-            products = products.filter(p =>
-                p.name.toLowerCase().includes(search) ||
-                p.brand.toLowerCase().includes(search)
-            );
-        }
-
-        // Apply category filter
-        if (this.filters.category !== 'all') {
-            products = products.filter(p => p.category === this.filters.category);
-        }
-
-        // Apply brand filter
-        if (this.filters.brand !== 'all') {
-            products = products.filter(p => p.brand === this.filters.brand);
-        }
-
-        // Apply stock filter
-        if (this.filters.stockOnly) {
-            products = products.filter(p => p.stock > 0);
-        }
-
-        // Apply price filter
-        products = products.filter(p => {
-            const defaultPrice = this.getDefaultPrice(p);
-            return defaultPrice >= this.filters.priceMin && defaultPrice <= this.filters.priceMax;
-        });
-
-        // Apply sorting
-        products = this.sortProducts(products);
-
-        // Add offer information
-        products = products.map(p => {
-            const applicableOffers = this.getApplicableOffers(p, activeOffers);
-            return { ...p, offers: applicableOffers };
-        });
-
-        return products;
-    }
-
-    sortProducts(products) {
-        const sorted = [...products];
-
-        switch (this.sortBy) {
-            case 'name-asc':
-                sorted.sort((a, b) => a.name.localeCompare(b.name));
-                break;
-            case 'name-desc':
-                sorted.sort((a, b) => b.name.localeCompare(a.name));
-                break;
-            case 'price-asc':
-                sorted.sort((a, b) => this.getDefaultPrice(a) - this.getDefaultPrice(b));
-                break;
-            case 'price-desc':
-                sorted.sort((a, b) => this.getDefaultPrice(b) - this.getDefaultPrice(a));
-                break;
-            case 'stock':
-                sorted.sort((a, b) => b.stock - a.stock);
-                break;
-        }
-
-        return sorted;
-    }
-
-    getDefaultPrice(product) {
-        const defaultPriceTier = product.prices.find(p => p.isDefault);
-        return defaultPriceTier ? defaultPriceTier.price : product.prices[0].price;
-    }
-
-    getCategories() {
-        const products = dataManager.getProducts();
-        const categories = [...new Set(products.map(p => p.category))];
-        return categories.sort();
-    }
-
-    getBrands() {
-        const products = dataManager.getProducts();
-        const brands = [...new Set(products.map(p => p.brand))];
-        return brands.sort();
-    }
-
-    // ============================================
-    // OFFERS LOGIC
-    // ============================================
-
-    getApplicableOffers(product, offers) {
-        const applicable = [];
-
-        for (const offer of offers) {
-            // Check if offer applies to this product
-            if (offer.applicationType === 'product' && offer.productIds.includes(product.id)) {
-                applicable.push(offer);
-            } else if (offer.applicationType === 'category' && offer.categories.includes(product.category)) {
-                applicable.push(offer);
-            } else if (offer.applicationType === 'all') {
-                applicable.push(offer);
-            }
-        }
-
-        return applicable;
-    }
-
-    calculateOfferDiscount(product, quantity, offers) {
-        let maxDiscount = 0;
-        let appliedOffer = null;
-
-        for (const offer of offers) {
-            // Check if customer is eligible (Welcome offer check)
-            if (offer.type === 'welcome') {
-                const customerBills = dataManager.getBillsByCustomer(this.customerName, this.customerMobile);
-                if (customerBills.length > 0) {
-                    continue; // Skip welcome offer for existing customers
-                }
-            }
-
-            // Check minimum quantity
-            if (offer.minQuantity && quantity < offer.minQuantity) {
-                continue;
-            }
-
-            let discount = 0;
-            const basePrice = this.getDefaultPrice(product) * quantity;
-
-            switch (offer.type) {
-                case 'percentage':
-                case 'welcome':
-                case 'festival':
-                case 'clearance':
-                    discount = (basePrice * offer.discountValue) / 100;
-                    break;
-
-                case 'fixed':
-                    discount = offer.discountValue;
-                    break;
-
-                case 'bogo':
-                    // Buy X Get Y free
-                    const freeItems = Math.floor(quantity / (offer.buyQuantity + offer.getQuantity)) * offer.getQuantity;
-                    discount = freeItems * this.getDefaultPrice(product);
-                    break;
-
-                case 'bulk':
-                    if (quantity >= offer.minQuantity) {
-                        discount = (basePrice * offer.discountValue) / 100;
-                    }
-                    break;
-            }
-
-            if (discount > maxDiscount) {
-                maxDiscount = discount;
-                appliedOffer = offer;
-            }
-        }
-
-        return { discount: maxDiscount, offer: appliedOffer };
-    }
-
-    // ============================================
-    // CART MANAGEMENT
-    // ============================================
-
-    addToCart(productId, quantity = 1) {
-        const product = dataManager.getProductById(productId);
-        if (!product) return;
-
-        // Check stock availability
-        const existingItem = this.cart.find(item => item.productId === productId);
-        const currentQty = existingItem ? existingItem.quantity : 0;
-        const newQty = currentQty + quantity;
-
-        if (newQty > product.stock) {
-            alert(`Only ${product.stock} units available in stock`);
-            return;
-        }
-
-        if (existingItem) {
-            existingItem.quantity = newQty;
+        // Ensure we have products loaded
+        if (!this.allProducts || this.allProducts.length === 0) {
+            await this.loadStaticMenu();
         } else {
-            this.cart.push({ productId, quantity });
-        }
-
-        this.render();
-    }
-
-    updateCartQuantity(productId, quantity) {
-        const product = dataManager.getProductById(productId);
-        if (!product) return;
-
-        if (quantity > product.stock) {
-            alert(`Only ${product.stock} units available in stock`);
-            return;
-        }
-
-        if (quantity <= 0) {
-            this.removeFromCart(productId);
-            return;
-        }
-
-        const item = this.cart.find(item => item.productId === productId);
-        if (item) {
-            item.quantity = quantity;
             this.render();
         }
     }
 
-    removeFromCart(productId) {
-        this.cart = this.cart.filter(item => item.productId !== productId);
-        this.render();
+        this.customerName = name.trim();
+this.customerMobile = mobile.trim();
+
+// Save to session
+sessionStorage.setItem('customer', JSON.stringify({
+    name: this.customerName,
+    mobile: this.customerMobile
+}));
+
+// Load customer data
+this.loadCustomerData();
+
+this.currentView = 'products';
+this.render();
     }
 
-    clearCart() {
-        this.cart = [];
-        this.pointsToUse = 0;
-        this.render();
+handleLogout() {
+    sessionStorage.removeItem('customer');
+    this.customerName = '';
+    this.customerMobile = '';
+    this.cart = [];
+    this.wishlist = [];
+    this.points = 0;
+    this.currentView = 'login';
+    this.render();
+}
+
+// ============================================
+// PRODUCT FILTERING & SORTING
+// ============================================
+
+getFilteredProducts() {
+    let products = this.isOffline ? (this.allProducts || []) : dataManager.getProducts();
+    const activeOffers = dataManager.getActiveOffers();
+
+    // Apply search filter
+    if (this.filters.search) {
+        const search = this.filters.search.toLowerCase();
+        products = products.filter(p =>
+            p.name.toLowerCase().includes(search) ||
+            p.brand.toLowerCase().includes(search)
+        );
     }
 
-    // ============================================
-    // WISHLIST MANAGEMENT
-    // ============================================
+    // Apply category filter
+    if (this.filters.category !== 'all') {
+        products = products.filter(p => p.category === this.filters.category);
+    }
 
-    toggleWishlist(productId) {
-        const index = this.wishlist.indexOf(productId);
-        if (index > -1) {
-            this.wishlist.splice(index, 1);
-        } else {
-            this.wishlist.push(productId);
+    // Apply brand filter
+    if (this.filters.brand !== 'all') {
+        products = products.filter(p => p.brand === this.filters.brand);
+    }
+
+    // Apply stock filter
+    if (this.filters.stockOnly) {
+        products = products.filter(p => p.stock > 0);
+    }
+
+    // Apply price filter
+    products = products.filter(p => {
+        const defaultPrice = this.getDefaultPrice(p);
+        return defaultPrice >= this.filters.priceMin && defaultPrice <= this.filters.priceMax;
+    });
+
+    // Apply sorting
+    products = this.sortProducts(products);
+
+    // Add offer information
+    products = products.map(p => {
+        const applicableOffers = this.getApplicableOffers(p, activeOffers);
+        return { ...p, offers: applicableOffers };
+    });
+
+    return products;
+}
+
+sortProducts(products) {
+    const sorted = [...products];
+
+    switch (this.sortBy) {
+        case 'name-asc':
+            sorted.sort((a, b) => a.name.localeCompare(b.name));
+            break;
+        case 'name-desc':
+            sorted.sort((a, b) => b.name.localeCompare(a.name));
+            break;
+        case 'price-asc':
+            sorted.sort((a, b) => this.getDefaultPrice(a) - this.getDefaultPrice(b));
+            break;
+        case 'price-desc':
+            sorted.sort((a, b) => this.getDefaultPrice(b) - this.getDefaultPrice(a));
+            break;
+        case 'stock':
+            sorted.sort((a, b) => b.stock - a.stock);
+            break;
+    }
+
+    return sorted;
+}
+
+getDefaultPrice(product) {
+    const defaultPriceTier = product.prices.find(p => p.isDefault);
+    return defaultPriceTier ? defaultPriceTier.price : product.prices[0].price;
+}
+
+getCategories() {
+    const products = dataManager.getProducts();
+    const categories = [...new Set(products.map(p => p.category))];
+    return categories.sort();
+}
+
+getBrands() {
+    const products = dataManager.getProducts();
+    const brands = [...new Set(products.map(p => p.brand))];
+    return brands.sort();
+}
+
+// ============================================
+// OFFERS LOGIC
+// ============================================
+
+getApplicableOffers(product, offers) {
+    const applicable = [];
+
+    for (const offer of offers) {
+        // Check if offer applies to this product
+        if (offer.applicationType === 'product' && offer.productIds.includes(product.id)) {
+            applicable.push(offer);
+        } else if (offer.applicationType === 'category' && offer.categories.includes(product.category)) {
+            applicable.push(offer);
+        } else if (offer.applicationType === 'all') {
+            applicable.push(offer);
         }
-        this.saveCustomerData();
-        this.render();
     }
 
-    isInWishlist(productId) {
-        return this.wishlist.includes(productId);
-    }
+    return applicable;
+}
 
-    // ============================================
-    // BILL CALCULATION
-    // ============================================
+calculateOfferDiscount(product, quantity, offers) {
+    let maxDiscount = 0;
+    let appliedOffer = null;
 
-    calculateCartTotal() {
-        let subtotal = 0;
-        let totalGST = 0;
-        let totalOfferDiscount = 0;
-        const items = [];
-
-        for (const cartItem of this.cart) {
-            const product = dataManager.getProductById(cartItem.productId);
-            if (!product) continue;
-
-            const basePrice = this.getDefaultPrice(product);
-            const itemSubtotal = basePrice * cartItem.quantity;
-
-            // Calculate offer discount
-            const activeOffers = dataManager.getActiveOffers();
-            const { discount, offer } = this.calculateOfferDiscount(
-                product,
-                cartItem.quantity,
-                activeOffers
-            );
-
-            const priceAfterOffer = itemSubtotal - discount;
-            const gstAmount = (priceAfterOffer * product.gst) / 100;
-
-            subtotal += itemSubtotal;
-            totalOfferDiscount += discount;
-            totalGST += gstAmount;
-
-            items.push({
-                product,
-                quantity: cartItem.quantity,
-                basePrice,
-                itemSubtotal,
-                offerDiscount: discount,
-                appliedOffer: offer,
-                gstAmount,
-                total: priceAfterOffer + gstAmount
-            });
-        }
-
-        const totalBeforePoints = subtotal - totalOfferDiscount + totalGST;
-
-        // Calculate points discount (Clamped to Bill Total)
-        const settings = dataManager.getSettings();
-        // Cap points usage to what's needed for the bill
-        const maxPointsNeeded = Math.ceil(totalBeforePoints / settings.pointsValue);
-        const maxPointsUsable = Math.min(this.pointsToUse, this.points, maxPointsNeeded);
-
-        const pointsDiscount = maxPointsUsable * settings.pointsValue;
-        const grandTotal = Math.max(0, totalBeforePoints - pointsDiscount);
-
-        return {
-            items,
-            subtotal,
-            totalOfferDiscount,
-            totalGST,
-            totalBeforePoints,
-            pointsDiscount,
-            pointsUsed: maxPointsUsable,
-            grandTotal
-        };
-    }
-
-    // ============================================
-    // BILL SUBMISSION
-    // ============================================
-
-    submitBillRequest() {
-        if (this.cart.length === 0) {
-            alert('Your cart is empty');
-            return;
-        }
-
-        const calculation = this.calculateCartTotal();
-
-        // Verify stock availability one more time
-        for (const item of calculation.items) {
-            if (item.quantity > item.product.stock) {
-                alert(`Insufficient stock for ${item.product.name}`);
-                return;
+    for (const offer of offers) {
+        // Check if customer is eligible (Welcome offer check)
+        if (offer.type === 'welcome') {
+            const customerBills = dataManager.getBillsByCustomer(this.customerName, this.customerMobile);
+            if (customerBills.length > 0) {
+                continue; // Skip welcome offer for existing customers
             }
         }
 
-        // Create bill request
-        const request = {
-            customerName: this.customerName,
-            customerMobile: this.customerMobile,
-            items: calculation.items.map(item => ({
-                productId: item.product.id,
-                productName: item.product.name,
-                brand: item.product.brand,
-                quantity: item.quantity,
-                basePrice: item.basePrice,
-                offerDiscount: item.offerDiscount,
-                appliedOffer: item.appliedOffer ? item.appliedOffer.name : null,
-                gst: item.product.gst,
-                gstAmount: item.gstAmount,
-                total: item.total
-            })),
-            subtotal: calculation.subtotal,
-            totalOfferDiscount: calculation.totalOfferDiscount,
-            totalGST: calculation.totalGST,
-            pointsUsed: calculation.pointsUsed,
-            pointsDiscount: calculation.pointsDiscount,
-            grandTotal: calculation.grandTotal,
-            status: 'pending'
-        };
-
-        // Check for duplicate requests
-        const existingRequests = dataManager.getRequests();
-        const isDuplicate = existingRequests.some(r =>
-            r.customerName === request.customerName &&
-            r.customerMobile === request.customerMobile &&
-            r.status === 'pending' &&
-            r.grandTotal === request.grandTotal &&
-            JSON.stringify(r.items) === JSON.stringify(request.items)
-        );
-
-        if (isDuplicate) {
-            alert('You have already submitted this request. Please wait for approval.');
-            return;
+        // Check minimum quantity
+        if (offer.minQuantity && quantity < offer.minQuantity) {
+            continue;
         }
 
-        // OFFLINE MODE CHECK
-        if (this.isOffline) {
-            this.checkoutViaWhatsApp(request);
-            return;
+        let discount = 0;
+        const basePrice = this.getDefaultPrice(product) * quantity;
+
+        switch (offer.type) {
+            case 'percentage':
+            case 'welcome':
+            case 'festival':
+            case 'clearance':
+                discount = (basePrice * offer.discountValue) / 100;
+                break;
+
+            case 'fixed':
+                discount = offer.discountValue;
+                break;
+
+            case 'bogo':
+                // Buy X Get Y free
+                const freeItems = Math.floor(quantity / (offer.buyQuantity + offer.getQuantity)) * offer.getQuantity;
+                discount = freeItems * this.getDefaultPrice(product);
+                break;
+
+            case 'bulk':
+                if (quantity >= offer.minQuantity) {
+                    discount = (basePrice * offer.discountValue) / 100;
+                }
+                break;
         }
 
-        const requestId = dataManager.addRequest(request);
-
-        // Clear cart but don't deduct points yet (will be done on approval)
-        this.clearCart();
-
-        alert('Bill request submitted successfully! You will be notified once approved.');
-        this.currentView = 'status';
-        this.render();
+        if (discount > maxDiscount) {
+            maxDiscount = discount;
+            appliedOffer = offer;
+        }
     }
 
-    // ============================================
-    // RENDER METHODS
-    // ============================================
+    return { discount: maxDiscount, offer: appliedOffer };
+}
 
-    render() {
-        // Focus Preservation Mechanism
-        const activeElement = document.activeElement;
-        const focusedId = activeElement ? activeElement.id : null;
-        const cursorStart = (activeElement && activeElement.value) ? activeElement.selectionStart : null;
-        const cursorEnd = (activeElement && activeElement.value) ? activeElement.selectionEnd : null;
+// ============================================
+// CART MANAGEMENT
+// ============================================
 
-        const app = document.getElementById('app');
+addToCart(productId, quantity = 1) {
+    const product = dataManager.getProductById(productId);
+    if (!product) return;
 
-        if (this.currentView === 'login') {
-            app.innerHTML = this.renderLogin();
-        } else {
-            app.innerHTML = `
+    // Check stock availability
+    const existingItem = this.cart.find(item => item.productId === productId);
+    const currentQty = existingItem ? existingItem.quantity : 0;
+    const newQty = currentQty + quantity;
+
+    if (newQty > product.stock) {
+        alert(`Only ${product.stock} units available in stock`);
+        return;
+    }
+
+    if (existingItem) {
+        existingItem.quantity = newQty;
+    } else {
+        this.cart.push({ productId, quantity });
+    }
+
+    this.render();
+}
+
+updateCartQuantity(productId, quantity) {
+    const product = dataManager.getProductById(productId);
+    if (!product) return;
+
+    if (quantity > product.stock) {
+        alert(`Only ${product.stock} units available in stock`);
+        return;
+    }
+
+    if (quantity <= 0) {
+        this.removeFromCart(productId);
+        return;
+    }
+
+    const item = this.cart.find(item => item.productId === productId);
+    if (item) {
+        item.quantity = quantity;
+        this.render();
+    }
+}
+
+removeFromCart(productId) {
+    this.cart = this.cart.filter(item => item.productId !== productId);
+    this.render();
+}
+
+clearCart() {
+    this.cart = [];
+    this.pointsToUse = 0;
+    this.render();
+}
+
+// ============================================
+// WISHLIST MANAGEMENT
+// ============================================
+
+toggleWishlist(productId) {
+    const index = this.wishlist.indexOf(productId);
+    if (index > -1) {
+        this.wishlist.splice(index, 1);
+    } else {
+        this.wishlist.push(productId);
+    }
+    this.saveCustomerData();
+    this.render();
+}
+
+isInWishlist(productId) {
+    return this.wishlist.includes(productId);
+}
+
+// ============================================
+// BILL CALCULATION
+// ============================================
+
+calculateCartTotal() {
+    let subtotal = 0;
+    let totalGST = 0;
+    let totalOfferDiscount = 0;
+    const items = [];
+
+    for (const cartItem of this.cart) {
+        const product = dataManager.getProductById(cartItem.productId);
+        if (!product) continue;
+
+        const basePrice = this.getDefaultPrice(product);
+        const itemSubtotal = basePrice * cartItem.quantity;
+
+        // Calculate offer discount
+        const activeOffers = dataManager.getActiveOffers();
+        const { discount, offer } = this.calculateOfferDiscount(
+            product,
+            cartItem.quantity,
+            activeOffers
+        );
+
+        const priceAfterOffer = itemSubtotal - discount;
+        const gstAmount = (priceAfterOffer * product.gst) / 100;
+
+        subtotal += itemSubtotal;
+        totalOfferDiscount += discount;
+        totalGST += gstAmount;
+
+        items.push({
+            product,
+            quantity: cartItem.quantity,
+            basePrice,
+            itemSubtotal,
+            offerDiscount: discount,
+            appliedOffer: offer,
+            gstAmount,
+            total: priceAfterOffer + gstAmount
+        });
+    }
+
+    const totalBeforePoints = subtotal - totalOfferDiscount + totalGST;
+
+    // Calculate points discount (Clamped to Bill Total)
+    const settings = dataManager.getSettings();
+    // Cap points usage to what's needed for the bill
+    const maxPointsNeeded = Math.ceil(totalBeforePoints / settings.pointsValue);
+    const maxPointsUsable = Math.min(this.pointsToUse, this.points, maxPointsNeeded);
+
+    const pointsDiscount = maxPointsUsable * settings.pointsValue;
+    const grandTotal = Math.max(0, totalBeforePoints - pointsDiscount);
+
+    return {
+        items,
+        subtotal,
+        totalOfferDiscount,
+        totalGST,
+        totalBeforePoints,
+        pointsDiscount,
+        pointsUsed: maxPointsUsable,
+        grandTotal
+    };
+}
+
+// ============================================
+// BILL SUBMISSION
+// ============================================
+
+submitBillRequest() {
+    if (this.cart.length === 0) {
+        alert('Your cart is empty');
+        return;
+    }
+
+    const calculation = this.calculateCartTotal();
+
+    // Verify stock availability one more time
+    for (const item of calculation.items) {
+        if (item.quantity > item.product.stock) {
+            alert(`Insufficient stock for ${item.product.name}`);
+            return;
+        }
+    }
+
+    // Create bill request
+    const request = {
+        customerName: this.customerName,
+        customerMobile: this.customerMobile,
+        items: calculation.items.map(item => ({
+            productId: item.product.id,
+            productName: item.product.name,
+            brand: item.product.brand,
+            quantity: item.quantity,
+            basePrice: item.basePrice,
+            offerDiscount: item.offerDiscount,
+            appliedOffer: item.appliedOffer ? item.appliedOffer.name : null,
+            gst: item.product.gst,
+            gstAmount: item.gstAmount,
+            total: item.total
+        })),
+        subtotal: calculation.subtotal,
+        totalOfferDiscount: calculation.totalOfferDiscount,
+        totalGST: calculation.totalGST,
+        pointsUsed: calculation.pointsUsed,
+        pointsDiscount: calculation.pointsDiscount,
+        grandTotal: calculation.grandTotal,
+        status: 'pending'
+    };
+
+    // Check for duplicate requests
+    const existingRequests = dataManager.getRequests();
+    const isDuplicate = existingRequests.some(r =>
+        r.customerName === request.customerName &&
+        r.customerMobile === request.customerMobile &&
+        r.status === 'pending' &&
+        r.grandTotal === request.grandTotal &&
+        JSON.stringify(r.items) === JSON.stringify(request.items)
+    );
+
+    if (isDuplicate) {
+        alert('You have already submitted this request. Please wait for approval.');
+        return;
+    }
+
+    // OFFLINE MODE CHECK
+    if (this.isOffline) {
+        this.checkoutViaWhatsApp(request);
+        return;
+    }
+
+    const requestId = dataManager.addRequest(request);
+
+    // Clear cart but don't deduct points yet (will be done on approval)
+    this.clearCart();
+
+    alert('Bill request submitted successfully! You will be notified once approved.');
+    this.currentView = 'status';
+    this.render();
+}
+
+// ============================================
+// RENDER METHODS
+// ============================================
+
+render() {
+    // Focus Preservation Mechanism
+    const activeElement = document.activeElement;
+    const focusedId = activeElement ? activeElement.id : null;
+    const cursorStart = (activeElement && activeElement.value) ? activeElement.selectionStart : null;
+    const cursorEnd = (activeElement && activeElement.value) ? activeElement.selectionEnd : null;
+
+    const app = document.getElementById('app');
+
+    if (this.currentView === 'login') {
+        app.innerHTML = this.renderLogin();
+    } else {
+        app.innerHTML = `
                 ${this.renderHeader()}
                 ${this.renderNavigation()}
                 ${this.renderContent()}
             `;
-        }
+    }
 
-        this.attachEventListeners();
+    this.attachEventListeners();
 
-        // Restore Focus
-        if (focusedId) {
-            const el = document.getElementById(focusedId);
-            if (el) {
-                el.focus();
-                if (cursorStart !== null && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
-                    try {
-                        el.setSelectionRange(cursorStart, cursorEnd);
-                    } catch (e) {
-                        // Some inputs like type='number' don't support selection range
-                    }
+    // Restore Focus
+    if (focusedId) {
+        const el = document.getElementById(focusedId);
+        if (el) {
+            el.focus();
+            if (cursorStart !== null && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
+                try {
+                    el.setSelectionRange(cursorStart, cursorEnd);
+                } catch (e) {
+                    // Some inputs like type='number' don't support selection range
                 }
             }
         }
     }
+}
 
-    renderLogin() {
-        return `
+renderLogin() {
+    return `
             <div class="customer-container">
                 <div style="max-width: 450px; margin: 80px auto; background: white; border: 3px solid black; border-radius: 12px; padding: 40px; box-shadow: 10px 10px 0px rgba(0,0,0,1);">
                     <div style="text-align: center; margin-bottom: 30px;">
@@ -645,12 +688,12 @@ class CustomerApp {
                 </div>
             </div>
         `;
-    }
+}
 
-    renderHeader() {
-        const shopInfo = dataManager.getShopInfo();
+renderHeader() {
+    const shopInfo = dataManager.getShopInfo();
 
-        return `
+    return `
             <div class="customer-header">
                 <div class="shop-info">
                     <h1>🛒 ${shopInfo.name}</h1>
@@ -669,17 +712,17 @@ class CustomerApp {
                 </div>
             </div>
         `;
-    }
+}
 
-    renderNavigation() {
-        const tabs = [
-            { id: 'products', label: '🛍️ Products', badge: null },
-            { id: 'cart', label: '🛒 Cart', badge: this.cart.length },
-            { id: 'wishlist', label: '❤️ Wishlist', badge: this.wishlist.length },
-            { id: 'status', label: '📋 My Bills', badge: null }
-        ];
+renderNavigation() {
+    const tabs = [
+        { id: 'products', label: '🛍️ Products', badge: null },
+        { id: 'cart', label: '🛒 Cart', badge: this.cart.length },
+        { id: 'wishlist', label: '❤️ Wishlist', badge: this.wishlist.length },
+        { id: 'status', label: '📋 My Bills', badge: null }
+    ];
 
-        return `
+    return `
             <div class="nav-tabs">
                 ${tabs.map(tab => `
                     <div class="nav-tab ${this.currentView === tab.id ? 'active' : ''}" 
@@ -690,29 +733,29 @@ class CustomerApp {
                 `).join('')}
             </div>
         `;
+}
+
+renderContent() {
+    switch (this.currentView) {
+        case 'products':
+            return this.renderProducts();
+        case 'cart':
+            return this.renderCart();
+        case 'wishlist':
+            return this.renderWishlist();
+        case 'status':
+            return this.renderBillStatus();
+        default:
+            return '';
     }
+}
 
-    renderContent() {
-        switch (this.currentView) {
-            case 'products':
-                return this.renderProducts();
-            case 'cart':
-                return this.renderCart();
-            case 'wishlist':
-                return this.renderWishlist();
-            case 'status':
-                return this.renderBillStatus();
-            default:
-                return '';
-        }
-    }
+renderProducts() {
+    const products = this.getFilteredProducts();
+    const categories = this.getCategories();
+    const brands = this.getBrands();
 
-    renderProducts() {
-        const products = this.getFilteredProducts();
-        const categories = this.getCategories();
-        const brands = this.getBrands();
-
-        return `
+    return `
             <div class="customer-container">
                 <div class="search-filter-section">
                     <div class="search-bar">
@@ -755,12 +798,12 @@ class CustomerApp {
                         <label style="font-weight: 700; color: black; margin-bottom: 8px; display: block;">Sort By</label>
                         <div class="sort-options">
                             ${[
-                { id: 'name-asc', label: 'Name A-Z' },
-                { id: 'name-desc', label: 'Name Z-A' },
-                { id: 'price-asc', label: 'Price Low-High' },
-                { id: 'price-desc', label: 'Price High-Low' },
-                { id: 'stock', label: 'Stock' }
-            ].map(sort => `
+            { id: 'name-asc', label: 'Name A-Z' },
+            { id: 'name-desc', label: 'Name Z-A' },
+            { id: 'price-asc', label: 'Price Low-High' },
+            { id: 'price-desc', label: 'Price High-Low' },
+            { id: 'stock', label: 'Stock' }
+        ].map(sort => `
                                 <button class="sort-btn ${this.sortBy === sort.id ? 'active' : ''}" 
                                         onclick="app.sortBy = '${sort.id}'; app.render();">
                                     ${sort.label}
@@ -780,36 +823,36 @@ class CustomerApp {
                 </div>
             </div>
         `;
+}
+
+renderProductCard(product) {
+    const defaultPrice = this.getDefaultPrice(product);
+    const cartItem = this.cart.find(item => item.productId === product.id);
+    const quantity = cartItem ? cartItem.quantity : 0;
+    const isWishlisted = this.isInWishlist(product.id);
+
+    let stockClass = 'in-stock';
+    let stockText = `${product.stock} in stock`;
+
+    if (product.stock === 0) {
+        stockClass = 'out-of-stock';
+        stockText = 'Out of Stock';
+    } else if (product.stock <= 5) {
+        stockClass = 'low-stock';
+        stockText = 'Low Stock';
+    } else {
+        stockClass = 'in-stock';
+        stockText = 'In Stock';
     }
 
-    renderProductCard(product) {
-        const defaultPrice = this.getDefaultPrice(product);
-        const cartItem = this.cart.find(item => item.productId === product.id);
-        const quantity = cartItem ? cartItem.quantity : 0;
-        const isWishlisted = this.isInWishlist(product.id);
+    // Show best offer
+    let offerHTML = '';
+    if (product.offers && product.offers.length > 0) {
+        const bestOffer = product.offers[0];
+        offerHTML = `<div class="offer-badge">🎉 ${bestOffer.name}</div>`;
+    }
 
-        let stockClass = 'in-stock';
-        let stockText = `${product.stock} in stock`;
-
-        if (product.stock === 0) {
-            stockClass = 'out-of-stock';
-            stockText = 'Out of Stock';
-        } else if (product.stock <= 5) {
-            stockClass = 'low-stock';
-            stockText = 'Low Stock';
-        } else {
-            stockClass = 'in-stock';
-            stockText = 'In Stock';
-        }
-
-        // Show best offer
-        let offerHTML = '';
-        if (product.offers && product.offers.length > 0) {
-            const bestOffer = product.offers[0];
-            offerHTML = `<div class="offer-badge">🎉 ${bestOffer.name}</div>`;
-        }
-
-        return `
+    return `
             <div class="product-card">
                 <div class="product-image-container">
                     <img src="${product.image}" alt="${product.name}" 
@@ -840,11 +883,11 @@ class CustomerApp {
                 </div>
             </div>
         `;
-    }
+}
 
-    renderCart() {
-        if (this.cart.length === 0) {
-            return `
+renderCart() {
+    if (this.cart.length === 0) {
+        return `
                 <div class="customer-container">
                     <div class="empty-state">
                         <div class="empty-state-icon">🛒</div>
@@ -855,12 +898,12 @@ class CustomerApp {
                     </div>
                 </div>
             `;
-        }
+    }
 
-        const calculation = this.calculateCartTotal();
-        const settings = dataManager.getSettings();
+    const calculation = this.calculateCartTotal();
+    const settings = dataManager.getSettings();
 
-        return `
+    return `
             <div class="customer-container">
                 <div class="cart-container">
                     <div class="cart-header">
@@ -955,21 +998,21 @@ class CustomerApp {
                 </div>
             </div>
         `;
-    }
+}
 
-    togglePointsUsage() {
-        if (this.pointsToUse > 0) {
-            this.pointsToUse = 0;
-        } else {
-            // Set to max available. Calculation logic will clamp it to needed amount.
-            this.pointsToUse = this.points;
-        }
-        this.render();
+togglePointsUsage() {
+    if (this.pointsToUse > 0) {
+        this.pointsToUse = 0;
+    } else {
+        // Set to max available. Calculation logic will clamp it to needed amount.
+        this.pointsToUse = this.points;
     }
+    this.render();
+}
 
-    renderWishlist() {
-        if (this.wishlist.length === 0) {
-            return `
+renderWishlist() {
+    if (this.wishlist.length === 0) {
+        return `
                 <div class="customer-container">
                     <div class="empty-state">
                         <div class="empty-state-icon">❤️</div>
@@ -980,17 +1023,17 @@ class CustomerApp {
                     </div>
                 </div>
             `;
-        }
+    }
 
-        const wishlistProducts = this.wishlist.map(id => dataManager.getProductById(id)).filter(p => p);
+    const wishlistProducts = this.wishlist.map(id => dataManager.getProductById(id)).filter(p => p);
 
-        return `
+    return `
             <div class="customer-container">
                 <h2 style="font-size: 24px; font-weight: 700; color: black; margin-bottom: 24px;">❤️ Your Wishlist</h2>
                 <div class="wishlist-grid">
                     ${wishlistProducts.map(product => {
-            const defaultPrice = this.getDefaultPrice(product);
-            return `
+        const defaultPrice = this.getDefaultPrice(product);
+        return `
                             <div class="wishlist-item">
                                 <button class="wishlist-remove" onclick="app.toggleWishlist('${product.id}')">×</button>
                                 <img src="${product.image}" alt="${product.name}" 
@@ -1006,31 +1049,31 @@ class CustomerApp {
                                 </button>
                             </div>
                         `;
-        }).join('')}
+    }).join('')}
                 </div>
             </div>
         `;
-    }
+}
 
-    renderBillStatus() {
-        const allRequests = dataManager.getRequests();
-        const myRequests = allRequests.filter(r =>
-            dataManager.getCustomerIdentity(r.customerName, r.customerMobile) ===
-            dataManager.getCustomerIdentity(this.customerName, this.customerMobile)
-        );
+renderBillStatus() {
+    const allRequests = dataManager.getRequests();
+    const myRequests = allRequests.filter(r =>
+        dataManager.getCustomerIdentity(r.customerName, r.customerMobile) ===
+        dataManager.getCustomerIdentity(this.customerName, this.customerMobile)
+    );
 
-        const allBills = dataManager.getBills();
-        const myBills = allBills.filter(b =>
-            dataManager.getCustomerIdentity(b.customerName, b.customerMobile) ===
-            dataManager.getCustomerIdentity(this.customerName, this.customerMobile)
-        );
+    const allBills = dataManager.getBills();
+    const myBills = allBills.filter(b =>
+        dataManager.getCustomerIdentity(b.customerName, b.customerMobile) ===
+        dataManager.getCustomerIdentity(this.customerName, this.customerMobile)
+    );
 
-        // Use a map to track unique requests by ID
-        const uniqueRequestsMap = new Map();
-        myRequests.forEach(req => uniqueRequestsMap.set(req.id, req));
-        const uniqueRequests = Array.from(uniqueRequestsMap.values());
+    // Use a map to track unique requests by ID
+    const uniqueRequestsMap = new Map();
+    myRequests.forEach(req => uniqueRequestsMap.set(req.id, req));
+    const uniqueRequests = Array.from(uniqueRequestsMap.values());
 
-        return `
+    return `
             <div class="customer-container">
                 <h2 style="font-size: 24px; font-weight: 700; color: black; margin-bottom: 24px;">📋 My Bills & Requests</h2>
                 
@@ -1055,7 +1098,7 @@ class CustomerApp {
                                     </div>
                                     <div class="bill-status ${request.status}">
                                         ${request.status === 'pending' ? '⏳ Pending' :
-                request.status === 'approved' ? '✅ Approved' : '❌ Rejected'}
+            request.status === 'approved' ? '✅ Approved' : '❌ Rejected'}
                                     </div>
                                 </div>
                                 
@@ -1165,82 +1208,82 @@ class CustomerApp {
                 `}
             </div>
         `;
+}
+
+attachEventListeners() {
+    // Login form
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('customerName').value;
+            const mobile = document.getElementById('customerMobile').value;
+            this.handleLogin(name, mobile);
+        });
     }
 
-    attachEventListeners() {
-        // Login form
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const name = document.getElementById('customerName').value;
-                const mobile = document.getElementById('customerMobile').value;
-                this.handleLogin(name, mobile);
-            });
-        }
+    // Search input
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            this.filters.search = e.target.value;
+            this.render();
+        });
+    }
 
-        // Search input
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
-                this.filters.search = e.target.value;
-                this.render();
-            });
+    // Category filter
+    const categoryFilter = document.getElementById('categoryFilter');
+    if (categoryFilter) {
+        categoryFilter.addEventListener('change', (e) => {
+            this.filters.category = e.target.value;
+            this.render();
         }
-
-        // Category filter
-        const categoryFilter = document.getElementById('categoryFilter');
-        if (categoryFilter) {
-            categoryFilter.addEventListener('change', (e) => {
-                this.filters.category = e.target.value;
-                this.render();
-            }
 
     // ============================================
     // OFFLINE HELPER METHODS
     // ============================================
 
     async loadStaticMenu() {
-                try {
-                    console.log('📦 Loading Static Menu...');
-                    const response = await fetch('products.json');
-                    if(response.ok) {
-                const products = await response.json();
-                this.allProducts = products; // Override with static data
-                this.render(); // Re-render with new data
-                console.log('✅ Loaded Static Menu (Offline Mode):', products.length, 'items');
-            } else {
-                console.error('❌ products.json not found');
-            }
-        } catch (e) {
-            console.error('Failed to load static menu:', e);
+            try {
+                console.log('📦 Loading Static Menu...');
+                const response = await fetch('products.json');
+                if(response.ok) {
+            const products = await response.json();
+            this.allProducts = products; // Override with static data
+            this.render(); // Re-render with new data
+            console.log('✅ Loaded Static Menu (Offline Mode):', products.length, 'items');
+        } else {
+            console.error('❌ products.json not found');
         }
+    } catch (e) {
+        console.error('Failed to load static menu:', e);
     }
+}
 
-    checkoutViaWhatsApp(request) {
-        // REPLACE WITH YOUR ACTUAL NUMBER
-        const phones = ["919876543210"];
-        const phone = phones[0];
+checkoutViaWhatsApp(request) {
+    // REPLACE WITH YOUR ACTUAL NUMBER
+    const phones = ["919876543210"];
+    const phone = phones[0];
 
-        let text = `*New Order Request* (Offline Mode)\n`;
-        text += `Customer: ${request.customerName || 'Guest'}\n`;
-        text += `Mobile: ${request.customerMobile || 'N/A'}\n\n`;
-        text += `*Items:*\n`;
+    let text = `*New Order Request* (Offline Mode)\n`;
+    text += `Customer: ${request.customerName || 'Guest'}\n`;
+    text += `Mobile: ${request.customerMobile || 'N/A'}\n\n`;
+    text += `*Items:*\n`;
 
-        request.items.forEach(item => {
-            text += `- ${item.productName} (${item.quantity} x ₹${item.basePrice}) = ₹${item.total}\n`;
-        });
+    request.items.forEach(item => {
+        text += `- ${item.productName} (${item.quantity} x ₹${item.basePrice}) = ₹${item.total}\n`;
+    });
 
-        text += `\n*Total Estimate: ₹${request.grandTotal}*`;
-        text += `\n(Sent from GitHub Offline Shop)`;
+    text += `\n*Total Estimate: ₹${request.grandTotal}*`;
+    text += `\n(Sent from GitHub Offline Shop)`;
 
-        const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
-        window.open(url, '_blank');
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
 
-        this.clearCart();
-        // Force reload to clear state cleanly
-        setTimeout(() => window.location.reload(), 1000);
-    }
+    this.clearCart();
+    // Force reload to clear state cleanly
+    setTimeout(() => window.location.reload(), 1000);
+}
 });
         }
 

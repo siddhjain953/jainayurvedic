@@ -33,12 +33,21 @@ fs.readdir(IMAGES_DIR, (err, files) => {
     files.forEach(file => {
         if (file.match(/\.(jpg|jpeg|png)$/i)) {
             const srcPath = path.join(IMAGES_DIR, file);
-            const destPath = path.join(PROCESSED_DIR, file);
 
-            // Simple copy for now (Phase 1)
-            // Phase 2 will add the 'sharp' library for actual compression
-            fs.copyFileSync(srcPath, destPath);
-            console.log(`✅ Processed: ${file}`);
+            // Clean filename (lowercase, replace spaces with dashes)
+            const ext = path.extname(file).toLowerCase();
+            const basename = path.basename(file, ext).toLowerCase().replace(/[^a-z0-9]/g, '-');
+            const newFilename = `${basename}${ext}`;
+            const destPath = path.join(PROCESSED_DIR, newFilename);
+
+            // Copy to assets folder
+            // In Phase 2: Add sharp() compression here
+            try {
+                fs.copyFileSync(srcPath, destPath);
+                console.log(`✅ Synced: ${file} -> assets/products/${newFilename}`);
+            } catch (err) {
+                console.error(`❌ Failed to sync ${file}:`, err.message);
+            }
         }
     });
 });

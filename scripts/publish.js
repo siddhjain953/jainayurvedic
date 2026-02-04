@@ -46,10 +46,17 @@ try {
             imagePath = p.image; // Keep existing external URLs
         }
 
+        // Extract default price
+        let defaultPrice = p.price || 0;
+        if (p.prices && p.prices.length > 0) {
+            const def = p.prices.find(tier => tier.isDefault) || p.prices[0];
+            defaultPrice = def.price;
+        }
+
         return {
             id: p.id,
             name: p.name,
-            price: p.price,
+            price: defaultPrice,
             category: p.category,
             brand: p.brand,
             image: imagePath || "https://via.placeholder.com/200?text=No+Image", // Link to Local Asset

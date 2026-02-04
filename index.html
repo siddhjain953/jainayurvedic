@@ -11,12 +11,42 @@
 </head>
 
 <body>
-    <div id="app"></div>
-    <!-- v2.0: Pure Customer Mode (Retailer Removed) -->
+    <!-- CRITICAL: ERROR HANDLER FOR WHITE SCREEN DEBUGGING -->
+    <div id="debug-console"
+        style="display:none; position:fixed; top:0; left:0; width:100%; background:black; color:#0f0; z-index:99999; padding:20px; font-family:monospace; border-bottom: 5px solid red; max-height: 50vh; overflow:auto;">
+        <h3>🚨 DEBUG CONSOLE</h3>
+        <ul id="error-list" style="list-style:none; padding:0;"></ul>
+        <button onclick="document.getElementById('debug-console').style.display='none'"
+            style="padding:10px; margin-top:10px;">Close Console</button>
+    </div>
+    <script>
+        window.onerror = function (msg, url, line, col, error) {
+            document.getElementById('debug-console').style.display = 'block';
+            var li = document.createElement('li');
+            li.innerHTML = '❌ <b>' + msg + '</b><br><small>' + url + ':' + line + '</small><br><small>' + (error ? error.stack : '') + '</small><hr style="border-color:#333">';
+            document.getElementById('error-list').appendChild(li);
+            return false;
+        };
+        window.addEventListener('unhandledrejection', function (event) {
+            document.getElementById('debug-console').style.display = 'block';
+            var li = document.createElement('li');
+            li.innerHTML = '⚠️ <b>Promise Rejection:</b> ' + event.reason;
+            document.getElementById('error-list').appendChild(li);
+        });
+    </script>
+    <div id="app">
+        <div
+            style="display:flex;justify-content:center;align-items:center;height:100vh;background:#f8fafc;color:#4f46e5;font-family:sans-serif;flex-direction:column;">
+            <div style="font-size:40px;margin-bottom:20px;">🛒</div>
+            <h2>Loading Kirana Shop...</h2>
+            <p>v3.1 (Cache Clear)</p>
+        </div>
+    </div>
+    <!-- v3.1: Forced Cache Clear -->
 
-    <!-- Data Manager & Customer Logic -->
-    <script src="dataManager.js"></script>
-    <script src="customer.js"></script>
+    <!-- Data Manager & Customer Logic with Timestamp to force reload -->
+    <script src="dataManager.js?v=3.1"></script>
+    <script src="customer.js?v=3.1"></script>
 </body>
 
 </html>

@@ -1,48 +1,64 @@
-node_modules
-.env
-*.log
-tunnel.log
-server.log
-secret.key
-vault/
-
 # ============================================
-# CRITICAL: RETAILER DATA PROTECTION
-# These files contain sensitive retailer data
-# and must NEVER be pushed to public GitHub
+# SENSITIVE DATA - NEVER COMMIT TO GITHUB
 # ============================================
 
-# Retailer Database (Contains stock, GSTIN, private pricing)
+# Local Database (Contains ALL customer data, orders, bills)
 data.json
 
-# Device Authorization (Contains device fingerprints)
-authorized_devices.json
+# Customer Personal Data (Names, mobiles, points, wishlist)
+customers.json
 
-# Retailer Platform Files (Keep local only)
-retailer.html
-retailer-login.html
-retailer.js
-retailer-extended.js
-retailer.css
-landing.html
+# API Configuration (Tunnel URL - changes frequently)
+api_config.json
 
-# Server (Local only)
+# Tunnel Logs
+tunnel.log
+*.log
+
+# ============================================
+# BACKEND CODE - KEEP PRIVATE
+# ============================================
+
+# Backend Server
 server.js
 
-# Local batch files (contain local paths)
-start.bat
-START_TODAY.bat
-PUBLISH_SHOP.bat
+# Data Manager (if contains sensitive logic)
+# dataManager.js
 
 # ============================================
-# PUBLIC DATA (ALLOWED for GitHub Pages)
-# These are sanitized for customer platform
+# RETAILER PLATFORM - KEEP PRIVATE
 # ============================================
-# products.json - Public product catalog (no stock)
-# customers.json - Customer loyalty data (no sensitive info)
-# shop.json - Public shop information (no GSTIN)
-# index.html - Customer platform entry
-# customer.html - Customer platform
-# customer.js - Customer platform logic
-# customer.css - Customer platform styles
-# SYNC_TO_GITHUB.bat - Public sync script
+
+# Retailer HTML and JS files
+retailer.html
+retailer.js
+retailer-extended.js
+
+# ============================================
+# NODE MODULES & DEPENDENCIES
+# ============================================
+
+node_modules/
+package-lock.json
+
+# ============================================
+# TEMPORARY FILES
+# ============================================
+
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# ============================================
+# WHAT GETS PUBLISHED TO GITHUB:
+# ============================================
+# ✅ index.html (Customer platform entry)
+# ✅ customer.js (Customer platform code)
+# ✅ customer.css (Customer platform styles)
+# ✅ products.json (Public snapshot - safe data only)
+# ✅ assets/ (Product images)
+# ✅ scripts/publish.js (Snapshot generator)
+# ✅ scripts/update_url.js (URL updater)
+# ✅ scripts/watch_tunnel.js (URL watcher)
+# ✅ START_COMPLETE.bat (Startup script)

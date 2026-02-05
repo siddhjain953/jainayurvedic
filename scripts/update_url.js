@@ -2,48 +2,168 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-// Parse --log argument
-const logArgIndex = process.argv.indexOf('--log');
-if (logArgIndex === -1 || !process.argv[logArgIndex + 1]) {
-    console.error('❌ Usage: node update_url.js --log <path-to-tunnel-log>');
-    process.exit(1);
+/**
+ * AUTO-UPDATE TUNNEL URL SYSTEM
+ * Monitors tunnel log, detects URL changes, updates products.json, and pushes to GitHub
+ */
+
+const CONFIG_FILE = path.join(__dirname, '../api_config.json');
+const PRODUCTS_FILE = path.join(__dirname, '../products.json');
+const LOG_FILE = process.argv[2] || path.join(__dirname, '../tunnel.log');
+
+console.log('🔄 Cloudflare Tunnel URL Auto-Update System');
+console.log('━'.repeat(50));
+
+// Function to extract URL from log
+function extractTunnelUrl(logPath) {
+    try {
+        if (!fs.existsSync(logPath)) {
+            console.log('⚠️  Log file not found:', logPath);
+            return null;
+        }
+
+        const logContent = fs.readFileSync(logPath, 'utf8');
+        const match = logContent.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+
+        if (match) {
+            return match[0];
+        }
+        return null;
+    } catch (error) {
+        console.error('❌ Error reading log:', error.message);
+        return null;
+    }
 }
-const logFile = process.argv[logArgIndex + 1];
 
-console.log(`🔍 Scanning log file: ${logFile}`);
+// Function to get current URL from config
+function getCurrentUrl() {
+    try {
+        if (!fs.existsSync(CONFIG_FILE)) {
+            return null;
+        }
+        const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+        return config.tunnelUrl || config.apiUrl;
+    } catch (error) {
+        return null;
+    }
+}
 
-try {
-    const logContent = fs.readFileSync(logFile, 'utf8');
-    // Regex to find https://[something].trycloudflare.com
-    const match = logContent.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+// Function to update config file
+function updateConfig(newUrl) {
+    const config = {
+        tunnelUrl: newUrl,
+        lastUpdated: new Date().toISOString()
+    };
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+    console.log('✅ Updated api_config.json');
+}
 
-    if (!match) {
-        console.error('❌ No Cloudflare URL found in log yet.');
+// Function to update products.json with new backend URL
+function updateProductsSnapshot(newUrl) {
+    try {
+        if (!fs.existsSync(PRODUCTS_FILE)) {
+            console.log('⚠️  products.json not found. Run publish.js first.');
+            return false;
+        }
+
+        const snapshot = JSON.parse(fs.readFileSync(PRODUCTS_FILE, 'utf8'));
+        snapshot.backendAvailabilityHint = newUrl;
+
+        if (snapshot.shop) {
+            snapshot.shop.lastUpdated = new Date().toISOString();
+        }
+
+        fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(snapshot, null, 2));
+        console.log('✅ Updated products.json with new backend URL');
+        return true;
+    } catch (error) {
+        console.error('❌ Error updating products.json:', error.message);
+        return false;
+    }
+}
+
+// Function to commit and push to GitHub
+function pushToGitHub() {
+    try {
+        const repoPath = path.join(__dirname, '../');
+
+        // Check if there are changes
+        try {
+            execSync('git diff --quiet products.json', { cwd: repoPath });
+            console.log('ℹ️  No changes to push');
+            return true;
+        } catch (e) {
+            // Changes detected, proceed with commit
+        }
+
+        console.log('📤 Pushing to GitHub...');
+        execSync('git add products.json', { cwd: repoPath, stdio: 'inherit' });
+        execSync(`git commit -m "🔄 Auto-update backend URL - ${new Date().toISOString()}"`, {
+            cwd: repoPath,
+            stdio: 'inherit'
+        });
+        execSync('git push origin main', { cwd: repoPath, stdio: 'inherit' });
+        console.log('✅ Successfully pushed to GitHub');
+        return true;
+    } catch (error) {
+        console.error('❌ Git push failed:', error.message);
+        console.log('ℹ️  You may need to push manually');
+        return false;
+    }
+}
+
+// Main execution
+function main() {
+    console.log('🔍 Checking for tunnel URL...');
+
+    const newUrl = extractTunnelUrl(LOG_FILE);
+    if (!newUrl) {
+        console.log('❌ No tunnel URL found in log file');
+        console.log('ℹ️  Make sure Cloudflare tunnel is running');
         process.exit(1);
     }
 
-    const newUrl = match[0];
-    console.log(`✅ Found Tunnel URL: ${newUrl}`);
+    console.log('🌐 Found URL:', newUrl);
 
-    const configPath = path.join(__dirname, '../api_config.json');
-    const config = {
-        apiUrl: newUrl,
-        lastUpdated: new Date().toISOString()
-    };
+    const currentUrl = getCurrentUrl();
 
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-
-    console.log('☁️ Syncing new URL to GitHub...');
-    execSync('git add api_config.json', { cwd: path.join(__dirname, '../') });
-    execSync('git commit -m "Auto-Update Tunnel URL"', { cwd: path.join(__dirname, '../') });
-    execSync('git push origin main', { cwd: path.join(__dirname, '../') });
-    console.log('🚀 URL Synced Successfully!');
-
-} catch (error) {
-    if (error.code === 'ENOENT') {
-        console.error('❌ Log file not found.');
-    } else {
-        console.error('⚠️ Error:', error.message);
+    if (currentUrl === newUrl) {
+        console.log('ℹ️  URL unchanged, no update needed');
+        process.exit(0);
     }
-    process.exit(1);
+
+    if (currentUrl) {
+        console.log('🔄 URL changed!');
+        console.log('   Old:', currentUrl);
+        console.log('   New:', newUrl);
+    } else {
+        console.log('🆕 First time setup');
+    }
+
+    // Update config file (local only, not pushed)
+    updateConfig(newUrl);
+
+    // Update products.json (this will be pushed to GitHub)
+    if (!updateProductsSnapshot(newUrl)) {
+        console.log('⚠️  Failed to update products.json');
+        console.log('ℹ️  Run: node scripts/publish.js');
+        process.exit(1);
+    }
+
+    // Push to GitHub
+    console.log('');
+    console.log('━'.repeat(50));
+    pushToGitHub();
+
+    console.log('');
+    console.log('━'.repeat(50));
+    console.log('✨ Update complete!');
+    console.log('ℹ️  Customer platform will now use:', newUrl);
 }
+
+// Run if called directly
+if (require.main === module) {
+    main();
+}
+
+module.exports = { extractTunnelUrl, updateConfig, updateProductsSnapshot, pushToGitHub };

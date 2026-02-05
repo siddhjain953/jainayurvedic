@@ -1,6 +1,6 @@
 /**
- * CUSTOMER PLATFORM - V5.0 BACKEND INTEGRATED
- * Features: Full backend API integration + Offline fallback
+ * CUSTOMER PLATFORM - V5.1 FIXED
+ * All bugs fixed: wishlist UI, navigation, points toggle, order rendering
  */
 
 class CustomerApp {
@@ -27,7 +27,7 @@ class CustomerApp {
     }
 
     async init() {
-        console.log('🚀 Initializing Customer Platform V5.0...');
+        console.log('🚀 Initializing Customer Platform V5.1...');
 
         // 1. Restore session
         const saved = sessionStorage.getItem('customer');
@@ -439,10 +439,18 @@ class CustomerApp {
                     <span class="mode-badge">${mode}</span>
                 </div>
                 <div class="header-right">
-                    <span class="points-badge">⭐ ${this.points} Points</span>
-                    <button onclick="customerApp.currentView='orders'; customerApp.render();" class="btn-orders">
-                        📋 Orders${orderBadge}
+                    ${this.isOnline ? `<span class="points-badge">⭐ ${this.points} Points</span>` : ''}
+                    <button onclick="customerApp.currentView='products'; customerApp.render();" class="btn-nav">
+                        🏠 Products
                     </button>
+                    ${this.isOnline ? `
+                        <button onclick="customerApp.currentView='wishlist'; customerApp.render();" class="btn-nav">
+                            ❤️ Wishlist (${this.wishlist.length})
+                        </button>
+                        <button onclick="customerApp.currentView='orders'; customerApp.render();" class="btn-orders">
+                            📋 Orders${orderBadge}
+                        </button>
+                    ` : ''}
                     <span class="cart-badge" onclick="customerApp.currentView='cart'; customerApp.render();">
                         🛒 Cart (${this.cart.length})
                     </span>
@@ -454,6 +462,7 @@ class CustomerApp {
 
     renderContent() {
         if (this.currentView === 'products') return this.renderProducts();
+        if (this.currentView === 'wishlist') return this.renderWishlist();
         if (this.currentView === 'cart') return this.renderCart();
         if (this.currentView === 'orders') return this.renderOrders();
         return '<p>Unknown view</p>';
@@ -501,7 +510,7 @@ class CustomerApp {
 
         return `
             <div class="product-card">
-                <button class="wishlist-btn" onclick="customerApp.toggleWishlist('${product.id}')">${wishlistIcon}</button>
+                ${this.isOnline ? `<button class="wishlist-btn" onclick="customerApp.toggleWishlist('${product.id}')">${wishlistIcon}</button>` : ''}
                 <img src="${product.image}" alt="${product.name}" onerror="this.src='https://via.placeholder.com/200'">
                 <h3>${product.name}</h3>
                 <p class="price">₹${product.price}</p>
@@ -518,6 +527,48 @@ class CustomerApp {
                         <button class="btn-add-cart" onclick="customerApp.addToCart('${product.id}')">Add to Cart</button>
                     `}
                 ` : '<button class="btn-disabled" disabled>Out of Stock</button>'}
+            </div>
+        `;
+    }
+
+    renderWishlist() {
+        if (!this.isOnline) {
+            return `
+                <div class="customer-container">
+                    <h2>❤️ My Wishlist</h2>
+                    <div class="empty-state">
+                        <p>⚠️ Wishlist requires online mode</p>
+                        <button onclick="customerApp.currentView='products'; customerApp.render();" class="btn-primary">
+                            Browse Products
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        const products = this.snapshot?.products || [];
+        const wishlistProducts = products.filter(p => this.wishlist.includes(p.id));
+
+        if (wishlistProducts.length === 0) {
+            return `
+                <div class="customer-container">
+                    <h2>❤️ My Wishlist</h2>
+                    <div class="empty-state">
+                        <p>Your wishlist is empty</p>
+                        <button onclick="customerApp.currentView='products'; customerApp.render();" class="btn-primary">
+                            Browse Products
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="customer-container">
+                <h2>❤️ My Wishlist (${wishlistProducts.length})</h2>
+                <div class="product-grid">
+                    ${wishlistProducts.map(p => this.renderProductCard(p)).join('')}
+                </div>
             </div>
         `;
     }
@@ -549,9 +600,10 @@ class CustomerApp {
         const gstRate = this.snapshot?.settings?.gstRate || 18;
         const gst = ((subtotal - discount) * gstRate) / 100;
 
-        // Calculate points discount
+        // Calculate points discount - ONLY if customer has points
         let pointsDiscount = 0;
-        if (this.pointsRedeemEnabled && this.isOnline) {
+        const hasPoints = this.points > 0;
+        if (this.pointsRedeemEnabled && this.isOnline && hasPoints) {
             const pointsRatio = this.snapshot?.settings?.pointsRatio || 100;
             pointsDiscount = Math.floor(this.points / pointsRatio);
         }
@@ -580,12 +632,12 @@ class CustomerApp {
                         <span>GST (${gstRate}%):</span>
                         <span>₹${gst.toFixed(2)}</span>
                     </div>
-                    ${this.isOnline ? `
+                    ${this.isOnline && hasPoints ? `
                         <div class="points-redemption">
                             <label>
                                 <input type="checkbox" ${this.pointsRedeemEnabled ? 'checked' : ''} 
                                        onchange="customerApp.togglePointsRedemption()">
-                                Use ${this.points} points (₹${pointsDiscount.toFixed(2)} off)
+                                Use ${this.points} points (₹${(this.points / (this.snapshot?.settings?.pointsRatio || 100)).toFixed(2)} off)
                             </label>
                         </div>
                         ${pointsDiscount > 0 ? `
@@ -688,6 +740,9 @@ class CustomerApp {
 
     renderPendingBill(bill) {
         const date = new Date(bill.createdAt).toLocaleString();
+        const total = bill.total || 0;
+        const pointsUsed = bill.pointsUsed || 0;
+
         return `
             <div class="order-card pending">
                 <div class="order-header">
@@ -696,15 +751,15 @@ class CustomerApp {
                 </div>
                 <div class="order-details">
                     <p><strong>Date:</strong> ${date}</p>
-                    <p><strong>Items:</strong> ${bill.items.length} products</p>
-                    <p><strong>Total:</strong> ₹${bill.total.toFixed(2)}</p>
-                    ${bill.pointsUsed > 0 ? `<p><strong>Points Used:</strong> ${bill.pointsUsed}</p>` : ''}
+                    <p><strong>Items:</strong> ${bill.items?.length || 0} products</p>
+                    <p><strong>Total:</strong> ₹${total.toFixed(2)}</p>
+                    ${pointsUsed > 0 ? `<p><strong>Points Used:</strong> ${pointsUsed}</p>` : ''}
                 </div>
                 <div class="order-items">
-                    ${bill.items.map(item => `
+                    ${(bill.items || []).map(item => `
                         <div class="order-item">
                             <span>${item.name} × ${item.quantity}</span>
-                            <span>₹${item.total.toFixed(2)}</span>
+                            <span>₹${(item.total || 0).toFixed(2)}</span>
                         </div>
                     `).join('')}
                 </div>
@@ -714,6 +769,8 @@ class CustomerApp {
 
     renderApprovedBill(bill) {
         const date = new Date(bill.approvedAt || bill.createdAt).toLocaleString();
+        const total = bill.total || 0;
+
         return `
             <div class="order-card approved">
                 <div class="order-header">
@@ -722,14 +779,14 @@ class CustomerApp {
                 </div>
                 <div class="order-details">
                     <p><strong>Date:</strong> ${date}</p>
-                    <p><strong>Items:</strong> ${bill.items.length} products</p>
-                    <p><strong>Total:</strong> ₹${bill.total.toFixed(2)}</p>
+                    <p><strong>Items:</strong> ${bill.items?.length || 0} products</p>
+                    <p><strong>Total:</strong> ₹${total.toFixed(2)}</p>
                 </div>
                 <div class="order-items">
-                    ${bill.items.map(item => `
+                    ${(bill.items || []).map(item => `
                         <div class="order-item">
                             <span>${item.name} × ${item.quantity}</span>
-                            <span>₹${item.total.toFixed(2)}</span>
+                            <span>₹${(item.total || 0).toFixed(2)}</span>
                         </div>
                     `).join('')}
                 </div>

@@ -132,7 +132,13 @@ class CustomerApp {
         return `
             <div class="customer-container">
                 <div class="products-grid">
-                    ${products.map(p => `
+                    ${products.map(p => {
+            // Get default price from prices array
+            const defaultPrice = p.prices && p.prices.length > 0
+                ? p.prices.find(pr => pr.isDefault)?.price || p.prices[0].price
+                : 0;
+
+            return `
                         <div class="product-card">
                             <div class="product-image-container">
                                 <img src="${p.image}" onerror="this.src='https://via.placeholder.com/200?text=${encodeURIComponent(p.name)}'">
@@ -140,11 +146,12 @@ class CustomerApp {
                             <div class="product-info">
                                 <p class="product-brand">${p.brand}</p>
                                 <h3 class="product-name">${p.name}</h3>
-                                <div class="product-price">₹${p.price}</div>
+                                <p class="product-measure">${p.measureValue} ${p.measureUnit}</p>
+                                <div class="product-price">₹${defaultPrice}</div>
                                 <button class="btn-add" onclick="alert('Adding to cloud request...')">Add to Cart</button>
                             </div>
                         </div>
-                    `).join('')}
+                    `}).join('')}
                 </div>
                 ${products.length === 0 ? '<p style="text-align:center; padding:40px;">Syncing products from laptop...</p>' : ''}
             </div>

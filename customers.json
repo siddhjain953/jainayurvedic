@@ -5,12 +5,24 @@
     "points": 2,
     "wishlist": [
       "P002"
-    ]
+    ],
+    "billHistory": [
+      "BILL1768922892458",
+      "BILL1769029156866",
+      "BILL1769082059462",
+      "BILL1769086182744",
+      "BILL1769086190614"
+    ],
+    "createdAt": "2026-01-19T18:07:39.387Z"
   },
   "thg_9999999999": {
     "name": "Thg",
     "mobile": "9999999999",
     "points": 0,
-    "wishlist": []
+    "wishlist": [],
+    "billHistory": [
+      "BILL1769976455252"
+    ],
+    "createdAt": "2026-02-01T20:06:58.610Z"
   }
 }

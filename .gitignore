@@ -3,14 +3,46 @@ node_modules
 *.log
 tunnel.log
 server.log
-data.json
 secret.key
 vault/
 
-# Retailer Platform (Local Only)
+# ============================================
+# CRITICAL: RETAILER DATA PROTECTION
+# These files contain sensitive retailer data
+# and must NEVER be pushed to public GitHub
+# ============================================
+
+# Retailer Database (Contains stock, GSTIN, private pricing)
+data.json
+
+# Device Authorization (Contains device fingerprints)
+authorized_devices.json
+
+# Retailer Platform Files (Keep local only)
 retailer.html
 retailer-login.html
 retailer.js
 retailer-extended.js
 retailer.css
 landing.html
+
+# Server (Local only)
+server.js
+
+# Local batch files (contain local paths)
+start.bat
+START_TODAY.bat
+PUBLISH_SHOP.bat
+
+# ============================================
+# PUBLIC DATA (ALLOWED for GitHub Pages)
+# These are sanitized for customer platform
+# ============================================
+# products.json - Public product catalog (no stock)
+# customers.json - Customer loyalty data (no sensitive info)
+# shop.json - Public shop information (no GSTIN)
+# index.html - Customer platform entry
+# customer.html - Customer platform
+# customer.js - Customer platform logic
+# customer.css - Customer platform styles
+# SYNC_TO_GITHUB.bat - Public sync script

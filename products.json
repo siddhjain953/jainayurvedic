@@ -2,33 +2,91 @@
   {
     "id": "P001",
     "name": "Tata Salt (1kg)",
-    "price": 20,
-    "category": "Groceries",
+    "baseName": "Tata Salt",
     "brand": "Tata",
-    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Tata+Salt"
+    "category": "Groceries",
+    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Tata+Salt",
+    "measureValue": "1",
+    "measureUnit": "kg",
+    "prices": [
+      {
+        "quantity": 1,
+        "price": 20,
+        "isDefault": true
+      }
+    ],
+    "gst": 0
   },
   {
     "id": "P002",
     "name": "Amul Butter (500gm)",
-    "price": 50,
-    "category": "Dairy",
+    "baseName": "Amul Butter",
     "brand": "Amul",
-    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Amul+Butter"
+    "category": "Dairy",
+    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Amul+Butter",
+    "measureValue": "500",
+    "measureUnit": "gm",
+    "prices": [
+      {
+        "quantity": 1,
+        "price": 55,
+        "isDefault": true
+      }
+    ],
+    "gst": 12
   },
   {
     "id": "P003",
     "name": "Maggi Noodles (70gm)",
-    "price": 12,
-    "category": "Instant Food",
+    "baseName": "Maggi Noodles",
     "brand": "Maggi",
-    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Maggi"
+    "category": "Instant Food",
+    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Maggi",
+    "measureValue": "70",
+    "measureUnit": "gm",
+    "prices": [
+      {
+        "quantity": 1,
+        "price": 12,
+        "isDefault": true
+      }
+    ],
+    "gst": 12
   },
   {
     "id": "P004",
     "name": "Parle-G Biscuits (250gm)",
-    "price": 10,
-    "category": "Snacks",
+    "baseName": "Parle-G Biscuits",
     "brand": "Parle",
-    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Parle-G"
+    "category": "Snacks",
+    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Parle-G",
+    "measureValue": "250",
+    "measureUnit": "gm",
+    "prices": [
+      {
+        "quantity": 1,
+        "price": 10,
+        "isDefault": true
+      }
+    ],
+    "gst": 18
+  },
+  {
+    "id": "P1770232354924",
+    "name": "milk (15L)",
+    "baseName": "milk",
+    "brand": "amul",
+    "category": "groceries",
+    "image": "https://ui-avatars.com/api/?name=amul%2Bmilk&background=ffffff&color=000000&size=512&bold=true&format=svg",
+    "measureValue": "15",
+    "measureUnit": "L",
+    "prices": [
+      {
+        "quantity": 1,
+        "price": 1800,
+        "isDefault": true
+      }
+    ],
+    "gst": 18
   }
 ]

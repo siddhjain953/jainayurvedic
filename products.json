@@ -1,92 +1,67 @@
-[
-  {
-    "id": "P001",
-    "name": "Tata Salt (1kg)",
-    "baseName": "Tata Salt",
-    "brand": "Tata",
-    "category": "Groceries",
-    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Tata+Salt",
-    "measureValue": "1",
-    "measureUnit": "kg",
-    "prices": [
-      {
-        "quantity": 1,
-        "price": 20,
-        "isDefault": true
-      }
-    ],
-    "gst": 0
+{
+  "shop": {
+    "name": "Sharma Kirana Store",
+    "phone": "+91 98765 43210",
+    "address": "123 Main Street, Delhi - 110001",
+    "lastUpdated": "2026-02-05T19:13:26.330Z"
   },
-  {
-    "id": "P002",
-    "name": "Amul Butter (500gm)",
-    "baseName": "Amul Butter",
-    "brand": "Amul",
-    "category": "Dairy",
-    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Amul+Butter",
-    "measureValue": "500",
-    "measureUnit": "gm",
-    "prices": [
-      {
-        "quantity": 1,
-        "price": 55,
-        "isDefault": true
-      }
-    ],
-    "gst": 12
+  "settings": {
+    "gstRate": 18,
+    "pointsRatio": 100,
+    "currency": "₹"
   },
-  {
-    "id": "P003",
-    "name": "Maggi Noodles (70gm)",
-    "baseName": "Maggi Noodles",
-    "brand": "Maggi",
-    "category": "Instant Food",
-    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Maggi",
-    "measureValue": "70",
-    "measureUnit": "gm",
-    "prices": [
-      {
-        "quantity": 1,
-        "price": 12,
-        "isDefault": true
-      }
-    ],
-    "gst": 12
-  },
-  {
-    "id": "P004",
-    "name": "Parle-G Biscuits (250gm)",
-    "baseName": "Parle-G Biscuits",
-    "brand": "Parle",
-    "category": "Snacks",
-    "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Parle-G",
-    "measureValue": "250",
-    "measureUnit": "gm",
-    "prices": [
-      {
-        "quantity": 1,
-        "price": 10,
-        "isDefault": true
-      }
-    ],
-    "gst": 18
-  },
-  {
-    "id": "P1770232354924",
-    "name": "milk (15L)",
-    "baseName": "milk",
-    "brand": "amul",
-    "category": "groceries",
-    "image": "https://ui-avatars.com/api/?name=amul%2Bmilk&background=ffffff&color=000000&size=512&bold=true&format=svg",
-    "measureValue": "15",
-    "measureUnit": "L",
-    "prices": [
-      {
-        "quantity": 1,
-        "price": 1800,
-        "isDefault": true
-      }
-    ],
-    "gst": 18
-  }
-]
+  "offers": [],
+  "products": [
+    {
+      "id": "P001",
+      "name": "Tata Salt (1kg)",
+      "price": 20,
+      "category": "Groceries",
+      "brand": "Tata",
+      "stock": 46,
+      "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Tata+Salt",
+      "offerLabel": null
+    },
+    {
+      "id": "P002",
+      "name": "Amul Butter (500gm)",
+      "price": 55,
+      "category": "Dairy",
+      "brand": "Amul",
+      "stock": 7,
+      "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Amul+Butter",
+      "offerLabel": null
+    },
+    {
+      "id": "P003",
+      "name": "Maggi Noodles (70gm)",
+      "price": 12,
+      "category": "Instant Food",
+      "brand": "Maggi",
+      "stock": 100,
+      "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Maggi",
+      "offerLabel": null
+    },
+    {
+      "id": "P004",
+      "name": "Parle-G Biscuits (250gm)",
+      "price": 10,
+      "category": "Snacks",
+      "brand": "Parle",
+      "stock": 65,
+      "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Parle-G",
+      "offerLabel": null
+    },
+    {
+      "id": "P1770232354924",
+      "name": "milk (15L)",
+      "price": 1800,
+      "category": "groceries",
+      "brand": "amul",
+      "stock": 10,
+      "image": "https://ui-avatars.com/api/?name=amul%2Bmilk&background=ffffff&color=000000&size=512&bold=true&format=svg",
+      "offerLabel": null
+    }
+  ],
+  "backendAvailabilityHint": "https://withdrawal-aim-today-greatly.trycloudflare.com"
+}

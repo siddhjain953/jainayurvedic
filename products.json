@@ -3,7 +3,7 @@
     "name": "Sharma Kirana Store",
     "phone": "+91 98765 43210",
     "address": "123 Main Street, Delhi - 110001",
-    "lastUpdated": "2026-02-05T19:24:37.799Z"
+    "lastUpdated": "2026-02-05T19:48:35.437Z"
   },
   "settings": {
     "gstRate": 18,
@@ -63,5 +63,5 @@
       "offerLabel": null
     }
   ],
-  "backendAvailabilityHint": "https://withdrawal-aim-today-greatly.trycloudflare.com"
+  "backendAvailabilityHint": "https://guestbook-jim-matt-utility.trycloudflare.com"
 }

@@ -140,7 +140,8 @@
         "P001",
         "P003"
       ],
-      "createdAt": "2026-02-05T19:30:10.370Z"
+      "createdAt": "2026-02-05T19:30:10.370Z",
+      "billHistory": []
     },
     "8974563215": {
       "name": "l",
@@ -150,11 +151,19 @@
         "P002",
         "P003"
       ],
-      "createdAt": "2026-02-06T05:59:16.753Z"
+      "createdAt": "2026-02-06T05:59:16.753Z",
+      "billHistory": []
     },
     "l_8974563215": {
       "name": "l",
       "mobile": "8974563215",
+      "points": 0,
+      "wishlist": [],
+      "billHistory": []
+    },
+    "h_9874563215": {
+      "name": "h",
+      "mobile": "9874563215",
       "points": 0,
       "wishlist": [],
       "billHistory": []

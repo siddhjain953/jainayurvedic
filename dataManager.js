@@ -294,12 +294,19 @@ class DataManager {
         return customers;
     }
 
+    getCustomerIdentity(name, mobile) {
+        // Normalize to prevent duplicates (case-insensitive name, clean mobile)
+        const cleanName = name.trim().toLowerCase();
+        const cleanMobile = mobile.trim().replace(/\D/g, ''); // Remove non-digits
+        return `${cleanName}_${cleanMobile}`;
+    }
+
     getCustomerData(name, mobile) {
         const customers = this.cache.customers || {};
         const identity = this.getCustomerIdentity(name, mobile);
         if (!customers[identity]) {
             customers[identity] = {
-                name: name.trim(),
+                name: name.trim(), // Keep original case for display
                 mobile: mobile.trim(),
                 points: 0,
                 wishlist: [],

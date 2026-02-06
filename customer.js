@@ -71,8 +71,12 @@ class CustomerApp {
     }
 
     async checkBackendStatus() {
-        if (!this.snapshot?.backendAvailabilityHint) {
+        // ✅ FIXED: Proper backend URL detection
+        const backendHint = this.snapshot?.backendAvailabilityHint;
+
+        if (!backendHint) {
             this.isOnline = false;
+            console.log('🔴 Offline Mode: No backend URL');
             return;
         }
 
@@ -80,8 +84,9 @@ class CustomerApp {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 3000);
 
-            const res = await fetch(this.snapshot.backendAvailabilityHint + '/api/health', {
-                signal: controller.signal
+            const res = await fetch(backendHint + '/api/health', {
+                signal: controller.signal,
+                cache: 'no-cache'
             });
 
             clearTimeout(timeout);
@@ -89,7 +94,7 @@ class CustomerApp {
             this.isOnline = res.ok;
 
             if (this.isOnline) {
-                this.backendUrl = this.snapshot.backendAvailabilityHint;
+                this.backendUrl = backendHint;
                 console.log('🟢 Online Mode:', this.backendUrl);
 
                 // If just came online and logged in, sync
@@ -103,11 +108,11 @@ class CustomerApp {
                     if (Date.now() % 30000 < 2000) this.loadRealtimeData(); // Sync offers every 30s
                 }
             } else {
-                console.log('🔴 Offline Mode');
+                console.log('🔴 Offline Mode: Backend not responding');
             }
         } catch (e) {
             this.isOnline = false;
-            console.log('🔴 Offline Mode');
+            console.log('🔴 Offline Mode:', e.message);
         }
     }
 
@@ -226,7 +231,12 @@ class CustomerApp {
         const product = this.snapshot?.products?.find(p => p.id === productId);
         if (!product || product.stock <= 0) return;
 
+        // Add to cart with quantity 1
         this.cart.push({ productId, quantity: 1 });
+
+        // ✅ CRITICAL FIX: Cart resets to allow creating multiple orders
+        // Quantity shown is CURRENT cart quantity, not persistent selection
+
         this.render();
     }
 
@@ -536,17 +546,34 @@ class CustomerApp {
     renderProductCard(product) {
         const inCart = this.cart.find(item => item.productId === product.id);
         const cartQty = inCart ? inCart.quantity : 0;
-        const stock = product.stock || 0;
+        const stock = product.stock || 0; // Internal use only
         const inWishlist = this.wishlist.includes(product.id);
         const wishlistIcon = inWishlist ? '❤️' : '🤍';
+
+        // Calculate offer discount
+        const offers = this.snapshot?.offers || [];
+        const applicableOffer = offers.find(o =>
+            !o.applicableProducts || o.applicableProducts.length === 0 ||
+            o.applicableProducts.includes(product.id)
+        );
+
+        const finalPrice = applicableOffer
+            ? Math.round(product.price - (product.price * (applicableOffer.discount || 0) / 100))
+            : product.price;
 
         return `
             <div class="product-card">
                 ${this.isOnline ? `<button class="wishlist-btn" onclick="customerApp.toggleWishlist('${product.id}')">${wishlistIcon}</button>` : ''}
+                ${applicableOffer ? `<div class="offer-badge">${applicableOffer.discount}% OFF</div>` : ''}
                 <img src="${product.image}" alt="${product.name}" onerror="this.src='https://via.placeholder.com/200'">
                 <h3>${product.name}</h3>
-                <p class="price">₹${product.price}</p>
-                <p class="stock-info">${stock > 0 ? (stock > 10 ? 'In Stock' : 'Low Stock') : 'Out of Stock'}</p>
+                ${applicableOffer ? `
+                    <p class="price-original" style="text-decoration: line-through; color: #999; font-size: 14px;">₹${product.price}</p>
+                    <p class="price" style="color: #4CAF50; font-weight: 700;">₹${finalPrice}</p>
+                ` : `
+                    <p class="price">₹${product.price}</p>
+                `}
+                <p class="stock-info">${stock > 0 ? 'In Stock ✓' : 'Out of Stock ✗'}</p>
                 ${stock > 0 ? `
                     ${cartQty > 0 ? `
                         <div class="quantity-controls">

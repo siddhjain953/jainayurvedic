@@ -351,6 +351,504 @@ function handleAPIRequest(req, res, parsedUrl) {
             }));
         }
 
+        // ==========================================
+        // CUSTOMER PLATFORM APIs
+        // ==========================================
+
+        // Health check endpoint (for online/offline detection)
+        else if (pathname === '/api/health' && method === 'GET') {
+            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                status: 'ok',
+                timestamp: new Date().toISOString(),
+                version: '1.0'
+            }));
+        }
+
+        // Customer Login/Session
+        else if (pathname === '/api/customer/login' && method === 'POST') {
+            const { mobile, name } = requestData;
+
+            if (!mobile || !name) {
+                res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Mobile and name required' }));
+                return;
+            }
+
+            // Initialize customer if not exists
+            if (!data.customers[mobile]) {
+                data.customers[mobile] = {
+                    name,
+                    mobile,
+                    points: 0,
+                    wishlist: [],
+                    createdAt: new Date().toISOString()
+                };
+                writeData(data);
+            } else {
+                // Update name if changed
+                data.customers[mobile].name = name;
+                writeData(data);
+            }
+
+            const customer = data.customers[mobile];
+            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                success: true,
+                customer: {
+                    name: customer.name,
+                    mobile: customer.mobile,
+                    points: customer.points || 0,
+                    wishlist: customer.wishlist || []
+                }
+            }));
+        }
+
+        // Get customer points
+        else if (pathname.startsWith('/api/customer/points/') && method === 'GET') {
+            const mobile = pathname.split('/').pop();
+            const customer = data.customers[mobile];
+
+            if (!customer) {
+                res.writeHead(404, { ...corsHeaders, 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Customer not found' }));
+                return;
+            }
+
+            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                points: customer.points || 0,
+                mobile: customer.mobile,
+                name: customer.name
+            }));
+        }
+
+        // Get customer wishlist
+        else if (pathname.startsWith('/api/customer/wishlist/') && method === 'GET') {
+            const mobile = pathname.split('/').pop();
+            const customer = data.customers[mobile];
+
+            if (!customer) {
+                res.writeHead(404, { ...corsHeaders, 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Customer not found' }));
+                return;
+            }
+
+            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                wishlist: customer.wishlist || []
+            }));
+        }
+
+        // Add to wishlist
+        else if (pathname === '/api/customer/wishlist/add' && method === 'POST') {
+            const { mobile, productId } = requestData;
+
+            if (!mobile || !productId) {
+                res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Mobile and productId required' }));
+                return;
+            }
+
+            if (!data.customers[mobile]) {
+                res.writeHead(404, { ...corsHeaders, 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Customer not found' }));
+                return;
+            }
+
+            if (!data.customers[mobile].wishlist) {
+                data.customers[mobile].wishlist = [];
+            }
+
+            if (!data.customers[mobile].wishlist.includes(productId)) {
+                data.customers[mobile].wishlist.push(productId);
+                writeData(data);
+            }
+
+            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                success: true,
+                wishlist: data.customers[mobile].wishlist
+            }));
+        }
+
+        // Remove from wishlist
+        else if (pathname === '/api/customer/wishlist/remove' && method === 'POST') {
+            const { mobile, productId } = requestData;
+
+            if (!mobile || !productId) {
+                res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Mobile and productId required' }));
+                return;
+            }
+
+            if (!data.customers[mobile]) {
+                res.writeHead(404, { ...corsHeaders, 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Customer not found' }));
+                return;
+            }
+
+            if (data.customers[mobile].wishlist) {
+                data.customers[mobile].wishlist = data.customers[mobile].wishlist.filter(id => id !== productId);
+                writeData(data);
+            }
+
+            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                success: true,
+                wishlist: data.customers[mobile].wishlist || []
+            }));
+        }
+
+        // Validate cart (check stock, calculate totals)
+        else if (pathname === '/api/customer/cart/validate' && method === 'POST') {
+            const { items, pointsRedeemEnabled } = requestData;
+
+            if (!items || !Array.isArray(items)) {
+                res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Items array required' }));
+                return;
+            }
+
+            const validatedItems = [];
+            let subtotal = 0;
+
+            // Validate each item
+            for (const item of items) {
+                const product = data.products.find(p => p.id === item.productId);
+                if (!product) continue;
+
+                const maxQty = Math.min(item.quantity, product.stock || 0);
+                if (maxQty <= 0) continue;
+
+                const itemTotal = product.price * maxQty;
+                subtotal += itemTotal;
+
+                validatedItems.push({
+                    productId: product.id,
+                    name: product.name,
+                    brand: product.brand || '', // Added brand
+                    price: product.price,
+                    quantity: maxQty,
+                    stock: product.stock,
+                    total: itemTotal
+                });
+            }
+
+            // Calculate discounts from offers
+            let discount = 0;
+            const appliedOffers = [];
+
+            if (data.offers) {
+                for (const offer of data.offers) {
+                    // Check validity
+                    if (offer.validUntil && new Date(offer.validUntil) < new Date()) continue;
+
+                    let applicable = false;
+
+                    if (offer.type === 'quantity') {
+                        const totalQty = validatedItems.reduce((sum, item) => {
+                            if (!offer.applicableProducts || offer.applicableProducts.length === 0 ||
+                                offer.applicableProducts.includes(item.productId)) {
+                                return sum + item.quantity;
+                            }
+                            return sum;
+                        }, 0);
+                        applicable = totalQty >= (offer.condition?.minQty || 0);
+                    } else if (offer.type === 'price') {
+                        applicable = subtotal >= (offer.condition?.minAmount || 0);
+                    }
+
+                    if (applicable) {
+                        let offerDiscount = 0;
+                        if (offer.discountType === 'percentage') {
+                            offerDiscount = (subtotal * offer.discount) / 100;
+                        } else {
+                            offerDiscount = offer.discount;
+                        }
+                        discount += offerDiscount;
+                        appliedOffers.push({
+                            label: offer.label || `${offer.discount}% OFF`,
+                            discount: offerDiscount
+                        });
+                    }
+                }
+            }
+
+            // Calculate GST
+            const gstRate = data.settings?.gstRate || 18;
+            const gst = ((subtotal - discount) * gstRate) / 100;
+
+            // Calculate points discount if enabled
+            let pointsDiscount = 0;
+            if (pointsRedeemEnabled && requestData.mobile) {
+                const customer = data.customers[requestData.mobile];
+                if (customer && customer.points) {
+                    const pointsRatio = data.settings?.pointsRatio || 100;
+                    pointsDiscount = Math.floor(customer.points / pointsRatio);
+                }
+            }
+
+            const total = subtotal - discount + gst - pointsDiscount;
+
+            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                validatedItems,
+                subtotal,
+                discount,
+                appliedOffers,
+                gst,
+                gstRate,
+                pointsDiscount,
+                total,
+                currency: data.settings?.currency || '₹'
+            }));
+        }
+
+        // Request bill (create pending order)
+        else if (pathname === '/api/customer/request-bill' && method === 'POST') {
+            const { mobile, name, items, pointsRedeemEnabled } = requestData;
+
+            if (!mobile || !name || !items || !Array.isArray(items)) {
+                res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Mobile, name, and items required' }));
+                return;
+            }
+
+            // Validate cart first
+            const validatedItems = [];
+            let subtotal = 0;
+
+            for (const item of items) {
+                const product = data.products.find(p => p.id === item.productId);
+                if (!product) continue;
+
+                const maxQty = Math.min(item.quantity, product.stock || 0);
+                if (maxQty <= 0) continue;
+
+                const itemTotal = product.price * maxQty;
+                subtotal += itemTotal;
+
+                validatedItems.push({
+                    productId: product.id,
+                    name: product.name,
+                    brand: product.brand || '', // Added brand
+                    price: product.price,
+                    quantity: maxQty,
+                    total: itemTotal
+                });
+            }
+
+            if (validatedItems.length === 0) {
+                res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'No valid items in cart' }));
+                return;
+            }
+
+            // Calculate discounts
+            let discount = 0;
+            const appliedOffers = [];
+
+            if (data.offers) {
+                for (const offer of data.offers) {
+                    if (offer.validUntil && new Date(offer.validUntil) < new Date()) continue;
+
+                    let applicable = false;
+
+                    if (offer.type === 'quantity') {
+                        const totalQty = validatedItems.reduce((sum, item) => {
+                            if (!offer.applicableProducts || offer.applicableProducts.length === 0 ||
+                                offer.applicableProducts.includes(item.productId)) {
+                                return sum + item.quantity;
+                            }
+                            return sum;
+                        }, 0);
+                        applicable = totalQty >= (offer.condition?.minQty || 0);
+                    } else if (offer.type === 'price') {
+                        applicable = subtotal >= (offer.condition?.minAmount || 0);
+                    }
+
+                    if (applicable) {
+                        let offerDiscount = 0;
+                        if (offer.discountType === 'percentage') {
+                            offerDiscount = (subtotal * offer.discount) / 100;
+                        } else {
+                            offerDiscount = offer.discount;
+                        }
+                        discount += offerDiscount;
+                        appliedOffers.push(offer.label || `${offer.discount}% OFF`);
+                    }
+                }
+            }
+
+            const gstRate = data.settings?.gstRate || 18;
+            const gst = ((subtotal - discount) * gstRate) / 100;
+
+            // Calculate points discount
+            let pointsDiscount = 0;
+            let pointsUsed = 0;
+            if (pointsRedeemEnabled) {
+                const customer = data.customers[mobile];
+                if (customer && customer.points) {
+                    const pointsRatio = data.settings?.pointsRatio || 100;
+                    pointsDiscount = Math.floor(customer.points / pointsRatio);
+                    pointsUsed = customer.points;
+                }
+            }
+
+            const total = subtotal - discount + gst - pointsDiscount;
+
+            // Create bill request
+            const requestId = 'REQ' + Date.now();
+            const billRequest = {
+                requestId,
+                customerMobile: mobile,
+                customerName: name,
+                items: validatedItems,
+                subtotal,
+                discount,
+                appliedOffers,
+                gst,
+                gstRate,
+                pointsUsed,
+                pointsDiscount,
+                total,
+                status: 'pending',
+                createdAt: new Date().toISOString()
+            };
+
+            if (!data.requests) {
+                data.requests = [];
+            }
+            data.requests.push(billRequest);
+            writeData(data);
+
+            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                success: true,
+                requestId,
+                status: 'pending',
+                total
+            }));
+        }
+
+        // Get customer order status
+        else if (pathname.startsWith('/api/customer/status/') && method === 'GET') {
+            const mobile = pathname.split('/').pop();
+
+            const pendingBills = (data.requests || []).filter(r =>
+                r.customerMobile === mobile && r.status === 'pending'
+            );
+
+            const approvedBills = (data.bills || []).filter(b =>
+                b.customerMobile === mobile
+            );
+
+            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                pendingBills,
+                approvedBills
+            }));
+        }
+
+        // Retailer: Approve bill request
+        else if (pathname === '/api/retailer/approve-bill' && method === 'POST') {
+            const { requestId } = requestData;
+
+            if (!requestId) {
+                res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Request ID required' }));
+                return;
+            }
+
+            const requestIndex = data.requests.findIndex(r => r.requestId === requestId);
+            if (requestIndex === -1) {
+                res.writeHead(404, { ...corsHeaders, 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Request not found' }));
+                return;
+            }
+
+            const request = data.requests[requestIndex];
+            const customer = data.customers[request.customerMobile];
+
+            if (!customer) {
+                res.writeHead(404, { ...corsHeaders, 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Customer not found' }));
+                return;
+            }
+
+            // Deduct points if used
+            if (request.pointsUsed > 0) {
+                customer.points = Math.max(0, (customer.points || 0) - request.pointsUsed);
+
+                // Recalculate other pending bills for this customer
+                const otherPendingBills = data.requests.filter(r =>
+                    r.customerMobile === request.customerMobile &&
+                    r.requestId !== requestId &&
+                    r.status === 'pending' &&
+                    r.pointsUsed > 0
+                );
+
+                for (const otherBill of otherPendingBills) {
+                    const pointsRatio = data.settings?.pointsRatio || 100;
+                    const newPointsDiscount = Math.floor(customer.points / pointsRatio);
+                    const oldPointsDiscount = otherBill.pointsDiscount;
+
+                    otherBill.pointsDiscount = newPointsDiscount;
+                    otherBill.total = otherBill.total + oldPointsDiscount - newPointsDiscount;
+                }
+            }
+
+            // Deduct stock
+            for (const item of request.items) {
+                const product = data.products.find(p => p.id === item.productId);
+                if (product) {
+                    product.stock = Math.max(0, (product.stock || 0) - item.quantity);
+                }
+            }
+
+            // Create bill
+            const billNumber = 'BILL' + Date.now();
+            const bill = {
+                ...request,
+                billNumber,
+                approvedAt: new Date().toISOString(),
+                status: 'approved'
+            };
+
+            if (!data.bills) {
+                data.bills = [];
+            }
+            data.bills.push(bill);
+
+            // Remove from requests
+            data.requests.splice(requestIndex, 1);
+
+            writeData(data);
+
+            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                success: true,
+                billNumber,
+                bill
+            }));
+        }
+
+        // Get bill details
+        else if (pathname.startsWith('/api/customer/bill/') && method === 'GET') {
+            const billNumber = pathname.split('/').pop();
+            const bill = (data.bills || []).find(b => b.billNumber === billNumber);
+
+            if (!bill) {
+                res.writeHead(404, { ...corsHeaders, 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Bill not found' }));
+                return;
+            }
+
+            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(bill));
+        }
+
         else {
             res.writeHead(404, { ...corsHeaders, 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Not found' }));

@@ -4,6 +4,7 @@
 
 # Local Database (Contains ALL customer data, orders, bills)
 data.json
+kirana_data.json
 
 # Customer Personal Data (Names, mobiles, points, wishlist)
 customers.json

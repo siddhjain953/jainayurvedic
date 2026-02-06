@@ -11,7 +11,7 @@ const https = require('https');
 const { spawn } = require('child_process');
 
 const PORT = 8000;
-const DATA_FILE = path.join(__dirname, 'data.json');
+const DATA_FILE = path.join(__dirname, 'kirana_data.json'); // Centralized data file
 const DEVICES_FILE = path.join(__dirname, 'authorized_devices.json');
 const ADMIN_PASSWORD = 'kirana2026'; // Default admin password - CHANGE THIS!
 
@@ -640,6 +640,7 @@ function handleAPIRequest(req, res, parsedUrl) {
             }
 
             if (validatedItems.length === 0) {
+                console.error('❌ Validation failed. Input items:', items);
                 res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'No valid items in cart' }));
                 return;

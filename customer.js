@@ -95,7 +95,12 @@ class CustomerApp {
                 // If just came online and logged in, sync
                 if (!wasOnline && this.customerMobile) {
                     await this.syncWithBackend();
-                    this.render();
+                }
+
+                // Periodic Sync if online (Orders & Data)
+                if (this.isOnline && this.customerMobile) {
+                    this.loadOrderStatus(); // Refresh order status
+                    if (Date.now() % 30000 < 2000) this.loadRealtimeData(); // Sync offers every 30s
                 }
             } else {
                 console.log('🔴 Offline Mode');
@@ -126,11 +131,37 @@ class CustomerApp {
                 this.wishlist = data.customer.wishlist || [];
                 console.log('✅ Synced with backend:', this.points, 'points');
 
+                // Load fresh products and offers from backend (Real-time updates)
+                await this.loadRealtimeData();
+
                 // Load order status
                 await this.loadOrderStatus();
             }
         } catch (e) {
             console.error('❌ Backend sync failed:', e);
+        }
+    }
+
+    async loadRealtimeData() {
+        if (!this.isOnline) return;
+        try {
+            // Fetch public data (products/offers) from backend
+            const res = await fetch(this.backendUrl + '/api/data');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.products) this.snapshot.products = data.products;
+                if (data.offers) this.snapshot.offers = data.offers;
+                if (data.settings) {
+                    this.snapshot.settings = { ...this.snapshot.settings, ...data.settings };
+                }
+                console.log('🔄 Real-time data updated');
+                // Only re-render if viewing products/cart to show new prices
+                if (['products', 'cart'].includes(this.currentView)) {
+                    this.render();
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ Real-time data fetch failed, using snapshot', e);
         }
     }
 
@@ -273,7 +304,7 @@ class CustomerApp {
                     body: JSON.stringify({
                         mobile: this.customerMobile,
                         name: this.customerName,
-                        items: this.cart,
+                        items: this.cart.map(i => ({ productId: i.productId, quantity: parseInt(i.quantity) })),
                         pointsRedeemEnabled: this.pointsRedeemEnabled
                     })
                 });
@@ -359,8 +390,9 @@ class CustomerApp {
 
             if (offer.type === 'quantity') {
                 const totalQty = cartItems.reduce((sum, item) => {
-                    if (!offer.applicableProducts || offer.applicableProducts.length === 0 ||
-                        offer.applicableProducts.includes(item.productId)) {
+                    const applicableIds = offer.applicableProducts || offer.productIds;
+                    if (!applicableIds || applicableIds.length === 0 ||
+                        applicableIds.includes(item.productId)) {
                         return sum + item.quantity;
                     }
                     return sum;
@@ -514,11 +546,11 @@ class CustomerApp {
                 <img src="${product.image}" alt="${product.name}" onerror="this.src='https://via.placeholder.com/200'">
                 <h3>${product.name}</h3>
                 <p class="price">₹${product.price}</p>
-                <p class="stock-info">${stock > 0 ? `${stock} in stock` : 'Out of stock'}</p>
+                <p class="stock-info">${stock > 0 ? (stock > 10 ? 'In Stock' : 'Low Stock') : 'Out of Stock'}</p>
                 ${stock > 0 ? `
                     ${cartQty > 0 ? `
                         <div class="quantity-controls">
-                            <button onclick="customerApp.updateCartQuantity('${product.id}', ${cartQty - 1})" ${cartQty <= 1 ? 'disabled' : ''}>−</button>
+                            <button onclick="customerApp.updateCartQuantity('${product.id}', ${cartQty - 1})">−</button>
                             <span>${cartQty}</span>
                             <button onclick="customerApp.updateCartQuantity('${product.id}', ${cartQty + 1})" ${cartQty >= stock ? 'disabled' : ''}>+</button>
                         </div>

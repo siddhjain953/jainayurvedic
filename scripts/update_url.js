@@ -97,6 +97,13 @@ function pushToGitHub() {
         }
 
         console.log('📤 Pushing to GitHub...');
+
+        try {
+            execSync('git pull origin main --rebase', { cwd: repoPath, stdio: 'inherit' });
+        } catch (e) {
+            console.log('⚠️ Git pull failed, continuing...');
+        }
+
         execSync('git add products.json', { cwd: repoPath, stdio: 'inherit' });
         execSync(`git commit -m "🔄 Auto-update backend URL - ${new Date().toISOString()}"`, {
             cwd: repoPath,

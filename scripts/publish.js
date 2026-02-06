@@ -2,8 +2,19 @@ const fs = require('fs');
 const path = require('path');
 
 // Configuration
-const DATA_FILE = path.join(__dirname, '../data.json');
+const DATA_FILE = path.join(__dirname, '../kirana_data.json'); // Changed to kirana_data.json
 const STATIC_PRODUCT_FILE = path.join(__dirname, '../products.json'); // Public file for GitHub
+const VERSION_FILE = path.join(__dirname, '../version.json');
+
+// Generate version timestamp
+const VERSION = Date.now().toString();
+const versionData = {
+    version: VERSION,
+    deployed: new Date().toISOString(),
+    description: "Auto-generated deployment version"
+};
+fs.writeFileSync(VERSION_FILE, JSON.stringify(versionData, null, 2));
+console.log(`📦 Version: ${VERSION}`);
 
 console.log('🔄 Generating Static Menu for Cloud...');
 
@@ -157,6 +168,21 @@ try {
     console.log('✅ Snapshot generated successfully!');
     console.log('🔒 Customer data NOT included (privacy protected)');
     console.log('ℹ️  Customer data accessible via backend API only');
+    console.log('');
+
+    // Update HTML files with new version
+    console.log('🔄 Updating HTML files with version...');
+    const htmlFiles = ['retailer.html', 'customer.html'];
+    htmlFiles.forEach(file => {
+        const htmlPath = path.join(__dirname, '..', file);
+        if (fs.existsSync(htmlPath)) {
+            let html = fs.readFileSync(htmlPath, 'utf8');
+            // Replace version query params
+            html = html.replace(/\?v=\d+/g, `?v=${VERSION}`);
+            fs.writeFileSync(htmlPath, html);
+            console.log(`   ✅ Updated ${file}`);
+        }
+    });
     console.log('');
 
 } catch (error) {

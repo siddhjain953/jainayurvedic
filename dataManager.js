@@ -36,8 +36,32 @@ class DataManager {
             this.initializeStorage();
         }
 
+        // Version check for cache invalidation
+        this.checkVersion();
+
         // Start background sync
         this.startSync();
+    }
+
+    async checkVersion() {
+        try {
+            const res = await fetch('version.json?t=' + Date.now());
+            if (res.ok) {
+                const versionData = await res.json();
+                const storedVersion = localStorage.getItem('app_version');
+
+                if (storedVersion && storedVersion !== versionData.version) {
+                    console.log('🔄 New version detected, clearing cache...');
+                    localStorage.clear();
+                    sessionStorage.clear();
+                }
+
+                localStorage.setItem('app_version', versionData.version);
+                console.log('✅ Version:', versionData.version);
+            }
+        } catch (e) {
+            console.log('⚠️ Could not check version');
+        }
     }
 
     async loadStaticFallbacks() {
@@ -218,7 +242,7 @@ class DataManager {
     // BILLING & CUSTOMERS
     // ============================================
 
-    getBills() { return this.cache.bills || []; }
+    getBills() { return (this.cache.bills || []).filter(b => b && typeof b === 'object'); }
     saveBills(bills) {
         this.cache.bills = bills;
         this.apiPost('/bills', { bills });
@@ -229,12 +253,13 @@ class DataManager {
         const bills = this.getBills();
         bill.billNumber = 'BILL' + Date.now();
         bill.timestamp = new Date().toISOString();
+        if (!bill.items) bill.items = [];
         bills.push(bill);
         this.saveBills(bills);
         return bill.billNumber;
     }
 
-    getRequests() { return this.cache.requests || []; }
+    getRequests() { return (this.cache.requests || []).filter(r => r && typeof r === 'object'); }
     saveRequests(requests) {
         this.cache.requests = requests;
         this.apiPost('/requests', { requests });
@@ -256,7 +281,18 @@ class DataManager {
         this.saveRequests(filtered);
     }
 
-    getAllCustomers() { return this.cache.customers || {}; }
+    getAllCustomers() {
+        const customers = this.cache.customers || {};
+        // Sanitize on read
+        Object.keys(customers).forEach(key => {
+            if (!customers[key]) delete customers[key];
+            else {
+                if (!customers[key].wishlist) customers[key].wishlist = [];
+                if (!customers[key].billHistory) customers[key].billHistory = [];
+            }
+        });
+        return customers;
+    }
 
     getCustomerData(name, mobile) {
         const customers = this.cache.customers || {};
@@ -301,6 +337,29 @@ class DataManager {
         this.cache.offers = offers;
         this.apiPost('/offers', { offers });
         this.notifyListeners('offers');
+    }
+
+    addOffer(offer) {
+        const offers = this.getOffers();
+        offer.id = 'OFF' + Date.now();
+        offers.push(offer);
+        this.saveOffers(offers);
+        return offer.id;
+    }
+
+    updateOffer(id, updates) {
+        const offers = this.getOffers();
+        const index = offers.findIndex(o => o.id === id);
+        if (index !== -1) {
+            offers[index] = { ...offers[index], ...updates };
+            this.saveOffers(offers);
+        }
+    }
+
+    deleteOffer(id) {
+        const offers = this.getOffers();
+        const filtered = offers.filter(o => o.id !== id);
+        this.saveOffers(filtered);
     }
 
     // ============================================

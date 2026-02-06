@@ -3,14 +3,29 @@
     "name": "Sharma Kirana Store",
     "phone": "+91 98765 43210",
     "address": "123 Main Street, Delhi - 110001",
-    "lastUpdated": "2026-02-06T19:23:43.581Z"
+    "lastUpdated": "2026-02-06T19:52:13.639Z"
   },
   "settings": {
     "gstRate": 18,
     "pointsRatio": 100,
     "currency": "₹"
   },
-  "offers": [],
+  "offers": [
+    {
+      "id": "OFF1770359553001",
+      "type": "percentage",
+      "condition": {},
+      "discountType": "percentage",
+      "applicableProducts": []
+    },
+    {
+      "id": "OFF1770361420999",
+      "type": "percentage",
+      "condition": {},
+      "discountType": "percentage",
+      "applicableProducts": []
+    }
+  ],
   "products": [
     {
       "id": "P001",
@@ -20,7 +35,7 @@
       "brand": "Tata",
       "stock": 46,
       "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Tata+Salt",
-      "offerLabel": null
+      "offerLabel": "undefined% OFF"
     },
     {
       "id": "P002",
@@ -28,9 +43,9 @@
       "price": 55,
       "category": "Dairy",
       "brand": "Amul",
-      "stock": 7,
+      "stock": 0,
       "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Amul+Butter",
-      "offerLabel": null
+      "offerLabel": "undefined% OFF"
     },
     {
       "id": "P003",
@@ -40,7 +55,7 @@
       "brand": "Maggi",
       "stock": 100,
       "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Maggi",
-      "offerLabel": null
+      "offerLabel": "undefined% OFF"
     },
     {
       "id": "P004",
@@ -50,7 +65,7 @@
       "brand": "Parle",
       "stock": 65,
       "image": "https://via.placeholder.com/200x200/ffffff/000000?text=Parle-G",
-      "offerLabel": null
+      "offerLabel": "undefined% OFF"
     },
     {
       "id": "P1770232354924",
@@ -60,8 +75,8 @@
       "brand": "amul",
       "stock": 10,
       "image": "https://ui-avatars.com/api/?name=amul%2Bmilk&background=ffffff&color=000000&size=512&bold=true&format=svg",
-      "offerLabel": null
+      "offerLabel": "undefined% OFF"
     }
   ],
-  "backendAvailabilityHint": "https://realtors-tract-welcome-brad.trycloudflare.com"
+  "backendAvailabilityHint": "https://naples-relation-domains-really.trycloudflare.com"
 }

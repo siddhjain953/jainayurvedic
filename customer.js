@@ -60,7 +60,9 @@ class CustomerApp {
 
     async loadSnapshot() {
         try {
-            const res = await fetch('products.json?t=' + Date.now());
+            const res = await fetch('products.json?t=' + Date.now(), {
+                cache: 'no-store'
+            });
             if (res.ok) {
                 this.snapshot = await res.json();
                 console.log('✅ Snapshot loaded:', this.snapshot.products?.length || 0, 'products');
@@ -70,49 +72,94 @@ class CustomerApp {
         }
     }
 
-    async checkBackendStatus() {
-        // ✅ FIXED: Proper backend URL detection
-        const backendHint = this.snapshot?.backendAvailabilityHint;
+    // Force refresh snapshot from GitHub to get latest tunnel URL
+    async forceRefreshSnapshot() {
+        try {
+            console.log('🔄 Force refreshing snapshot from server...');
+            const timestamp = Date.now();
+            const res = await fetch(`products.json?force=${timestamp}&nocache=${Math.random()}`, {
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache'
+                }
+            });
+            if (res.ok) {
+                const newSnapshot = await res.json();
+                const oldUrl = this.snapshot?.backendAvailabilityHint;
+                const newUrl = newSnapshot?.backendAvailabilityHint;
 
-        if (!backendHint) {
-            this.isOnline = false;
-            console.log('🔴 Offline Mode: No backend URL');
-            return;
+                if (oldUrl !== newUrl) {
+                    console.log('🆕 New backend URL detected:', newUrl);
+                }
+
+                this.snapshot = newSnapshot;
+                return true;
+            }
+        } catch (e) {
+            console.error('❌ Failed to refresh snapshot:', e);
         }
+        return false;
+    }
+
+    // Try to connect to a specific backend URL
+    async tryBackendConnection(url) {
+        if (!url) return false;
 
         try {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 3000);
 
-            const res = await fetch(backendHint + '/api/health', {
-                signal: controller.signal,
-                cache: 'no-cache'
+            const res = await fetch(url + '/api/health', {
+                signal: controller.signal
             });
 
             clearTimeout(timeout);
-            const wasOnline = this.isOnline;
-            this.isOnline = res.ok;
-
-            if (this.isOnline) {
-                this.backendUrl = backendHint;
-                console.log('🟢 Online Mode:', this.backendUrl);
-
-                // If just came online and logged in, sync
-                if (!wasOnline && this.customerMobile) {
-                    await this.syncWithBackend();
-                }
-
-                // Periodic Sync if online (Orders & Data)
-                if (this.isOnline && this.customerMobile) {
-                    this.loadOrderStatus(); // Refresh order status
-                    if (Date.now() % 30000 < 2000) this.loadRealtimeData(); // Sync offers every 30s
-                }
-            } else {
-                console.log('🔴 Offline Mode: Backend not responding');
-            }
+            return res.ok;
         } catch (e) {
-            this.isOnline = false;
-            console.log('🔴 Offline Mode:', e.message);
+            return false;
+        }
+    }
+
+    async checkBackendStatus() {
+        const wasOnline = this.isOnline;
+
+        // First attempt: Try current URL
+        let success = await this.tryBackendConnection(this.snapshot?.backendAvailabilityHint);
+
+        // Second attempt: If failed, refresh snapshot and try new URL
+        if (!success) {
+            console.log('🔄 Backend unavailable, checking for new URL...');
+            await this.forceRefreshSnapshot();
+            success = await this.tryBackendConnection(this.snapshot?.backendAvailabilityHint);
+        }
+
+        // Third attempt: Wait 3 seconds and try again (URL might be updating)
+        if (!success) {
+            console.log('⏳ Retrying in 3 seconds...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            await this.forceRefreshSnapshot();
+            success = await this.tryBackendConnection(this.snapshot?.backendAvailabilityHint);
+        }
+
+        this.isOnline = success;
+
+        if (this.isOnline) {
+            this.backendUrl = this.snapshot.backendAvailabilityHint;
+            console.log('🟢 Online Mode:', this.backendUrl);
+
+            // If just came online and logged in, sync
+            if (!wasOnline && this.customerMobile) {
+                await this.syncWithBackend();
+            }
+
+            // Periodic Sync if online (Orders & Data)
+            if (this.isOnline && this.customerMobile) {
+                this.loadOrderStatus(); // Refresh order status
+                if (Date.now() % 30000 < 2000) this.loadRealtimeData(); // Sync offers every 30s
+            }
+        } else {
+            console.log('🔴 Offline Mode (backend not reachable)');
         }
     }
 
@@ -231,12 +278,7 @@ class CustomerApp {
         const product = this.snapshot?.products?.find(p => p.id === productId);
         if (!product || product.stock <= 0) return;
 
-        // Add to cart with quantity 1
         this.cart.push({ productId, quantity: 1 });
-
-        // ✅ CRITICAL FIX: Cart resets to allow creating multiple orders
-        // Quantity shown is CURRENT cart quantity, not persistent selection
-
         this.render();
     }
 
@@ -546,34 +588,17 @@ class CustomerApp {
     renderProductCard(product) {
         const inCart = this.cart.find(item => item.productId === product.id);
         const cartQty = inCart ? inCart.quantity : 0;
-        const stock = product.stock || 0; // Internal use only
+        const stock = product.stock || 0;
         const inWishlist = this.wishlist.includes(product.id);
         const wishlistIcon = inWishlist ? '❤️' : '🤍';
-
-        // Calculate offer discount
-        const offers = this.snapshot?.offers || [];
-        const applicableOffer = offers.find(o =>
-            !o.applicableProducts || o.applicableProducts.length === 0 ||
-            o.applicableProducts.includes(product.id)
-        );
-
-        const finalPrice = applicableOffer
-            ? Math.round(product.price - (product.price * (applicableOffer.discount || 0) / 100))
-            : product.price;
 
         return `
             <div class="product-card">
                 ${this.isOnline ? `<button class="wishlist-btn" onclick="customerApp.toggleWishlist('${product.id}')">${wishlistIcon}</button>` : ''}
-                ${applicableOffer ? `<div class="offer-badge">${applicableOffer.discount}% OFF</div>` : ''}
                 <img src="${product.image}" alt="${product.name}" onerror="this.src='https://via.placeholder.com/200'">
                 <h3>${product.name}</h3>
-                ${applicableOffer ? `
-                    <p class="price-original" style="text-decoration: line-through; color: #999; font-size: 14px;">₹${product.price}</p>
-                    <p class="price" style="color: #4CAF50; font-weight: 700;">₹${finalPrice}</p>
-                ` : `
-                    <p class="price">₹${product.price}</p>
-                `}
-                <p class="stock-info">${stock > 0 ? 'In Stock ✓' : 'Out of Stock ✗'}</p>
+                <p class="price">₹${product.price}</p>
+                <p class="stock-info">${stock > 0 ? (stock > 10 ? 'In Stock' : 'Low Stock') : 'Out of Stock'}</p>
                 ${stock > 0 ? `
                     ${cartQty > 0 ? `
                         <div class="quantity-controls">

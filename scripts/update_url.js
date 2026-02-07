@@ -82,8 +82,10 @@ function updateProductsSnapshot(newUrl) {
     }
 }
 
-// Function to commit and push to GitHub
-function pushToGitHub() {
+// Function to commit and push to GitHub with retry
+function pushToGitHub(retryCount = 0) {
+    const MAX_RETRIES = 3;
+
     try {
         const repoPath = path.join(__dirname, '../');
 
@@ -96,7 +98,7 @@ function pushToGitHub() {
             // Changes detected, proceed with commit
         }
 
-        console.log('📤 Pushing to GitHub...');
+        console.log('📤 Pushing to GitHub... (Attempt ' + (retryCount + 1) + '/' + MAX_RETRIES + ')');
 
         try {
             execSync('git pull origin main --rebase', { cwd: repoPath, stdio: 'inherit' });
@@ -104,17 +106,30 @@ function pushToGitHub() {
             console.log('⚠️ Git pull failed, continuing...');
         }
 
-        execSync('git add products.json', { cwd: repoPath, stdio: 'inherit' });
+        execSync('git add products.json api_config.json', { cwd: repoPath, stdio: 'inherit' });
         execSync(`git commit -m "🔄 Auto-update backend URL - ${new Date().toISOString()}"`, {
             cwd: repoPath,
             stdio: 'inherit'
         });
         execSync('git push origin main', { cwd: repoPath, stdio: 'inherit' });
-        console.log('✅ Successfully pushed to GitHub');
+
+        console.log('✅ Successfully pushed to GitHub!');
+        console.log('🌐 GitHub Pages will refresh in ~1-2 minutes');
         return true;
     } catch (error) {
         console.error('❌ Git push failed:', error.message);
-        console.log('ℹ️  You may need to push manually');
+
+        // Retry logic
+        if (retryCount < MAX_RETRIES - 1) {
+            console.log('🔄 Retrying in 5 seconds...');
+            // Use synchronous wait
+            const start = Date.now();
+            while (Date.now() - start < 5000) { /* busy wait */ }
+            return pushToGitHub(retryCount + 1);
+        }
+
+        console.log('❌ All retry attempts failed');
+        console.log('ℹ️  You may need to push manually: git push origin main');
         return false;
     }
 }

@@ -1,65 +1,43 @@
-# ============================================
-# SENSITIVE DATA - NEVER COMMIT TO GITHUB
-# ============================================
-
-# Local Database (Contains ALL customer data, orders, bills)
-data.json
-kirana_data.json
-
-# Customer Personal Data (Names, mobiles, points, wishlist)
-customers.json
-
-# API Configuration (Tunnel URL - changes frequently)
-api_config.json
-
-# Tunnel Logs
-tunnel.log
-*.log
-
-# ============================================
-# BACKEND CODE - KEEP PRIVATE
-# ============================================
-
-# Backend Server
-server.js
-
-# Data Manager (if contains sensitive logic)
-# dataManager.js
-
-# ============================================
-# RETAILER PLATFORM - KEEP PRIVATE
-# ============================================
-
-# Retailer HTML and JS files
-retailer.html
-retailer.js
-retailer-extended.js
-
-# ============================================
-# NODE MODULES & DEPENDENCIES
-# ============================================
-
+# Dependencies
 node_modules/
-package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# ============================================
-# TEMPORARY FILES
-# ============================================
+# Environment variables
+.env
+.env.local
+.env.production
 
-*.tmp
-*.temp
+# Data files (keep local only)
+data/*.json
+!data/.gitkeep
+
+# Cloudflare tunnel (not needed on Render)
+cloudflare/cloudflared.exe
+cloudflare/*.log
+cloudflare/api_config.json
+
+# Logs
+*.log
+logs/
+server.log
+
+# OS files
 .DS_Store
 Thumbs.db
 
-# ============================================
-# WHAT GETS PUBLISHED TO GITHUB:
-# ============================================
-# ✅ index.html (Customer platform entry)
-# ✅ customer.js (Customer platform code)
-# ✅ customer.css (Customer platform styles)
-# ✅ products.json (Public snapshot - safe data only)
-# ✅ assets/ (Product images)
-# ✅ scripts/publish.js (Snapshot generator)
-# ✅ scripts/update_url.js (URL updater)
-# ✅ scripts/watch_tunnel.js (URL watcher)
-# ✅ START_COMPLETE.bat (Startup script)
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Credentials and secrets
+*.key
+secret.key
+authorized_devices.json
+
+# Temporary files
+*.tmp
+temp/

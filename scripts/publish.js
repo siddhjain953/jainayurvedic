@@ -2,19 +2,8 @@ const fs = require('fs');
 const path = require('path');
 
 // Configuration
-const DATA_FILE = path.join(__dirname, '../kirana_data.json'); // Changed to kirana_data.json
+const DATA_FILE = path.join(__dirname, '../data.json');
 const STATIC_PRODUCT_FILE = path.join(__dirname, '../products.json'); // Public file for GitHub
-const VERSION_FILE = path.join(__dirname, '../version.json');
-
-// Generate version timestamp
-const VERSION = Date.now().toString();
-const versionData = {
-    version: VERSION,
-    deployed: new Date().toISOString(),
-    description: "Auto-generated deployment version"
-};
-fs.writeFileSync(VERSION_FILE, JSON.stringify(versionData, null, 2));
-console.log(`📦 Version: ${VERSION}`);
 
 console.log('🔄 Generating Static Menu for Cloud...');
 
@@ -64,126 +53,47 @@ try {
             defaultPrice = def.price;
         }
 
-        // Find applicable offer label
-        let offerLabel = null;
-        if (db.offers) {
-            const applicableOffer = db.offers.find(offer => {
-                if (!offer.applicableProducts || offer.applicableProducts.length === 0) return true;
-                return offer.applicableProducts.includes(p.id);
-            });
-            if (applicableOffer) {
-                offerLabel = applicableOffer.label || `${applicableOffer.discount}% OFF`;
-            }
-        }
-
         return {
             id: p.id,
             name: p.name,
             price: defaultPrice,
             category: p.category,
             brand: p.brand,
-            stock: p.stock || 0, // Include stock for quantity validation
-            image: imagePath || "https://via.placeholder.com/200?text=No+Image",
-            description: p.description,
-            offerLabel: offerLabel
+            image: imagePath || "https://via.placeholder.com/200?text=No+Image", // Link to Local Asset
+            description: p.description
         };
     });
 
-    // Get shop info and settings
-    const shopInfo = db.shop || {
-        name: "Jain Ayurvedic",
-        phone: "+91 9876543210",
-        address: ""
-    };
-
-    const settings = db.settings || {
-        gstRate: 18,
-        pointsRatio: 10,
-        currency: "₹",
-        adminPassword: "admin123"
-    };
-
-    // Filter active offers (valid until date hasn't passed)
-    const now = new Date();
-    const activeOffers = (db.offers || [])
-        .filter(offer => {
-            if (!offer.validUntil) return true;
-            return new Date(offer.validUntil) > now;
-        })
-        .map(offer => ({
-            id: offer.id,
-            type: offer.type || 'percentage',
-            condition: offer.condition || {},
-            discount: offer.discount,
-            discountType: offer.discountType || 'percentage',
-            applicableProducts: offer.applicableProducts || [],
-            validUntil: offer.validUntil,
-            label: offer.label
-        }));
-
-    // Read backend hint from api_config.json if exists
-    let backendHint = null;
-    const apiConfigPath = path.join(__dirname, '../api_config.json');
-    if (fs.existsSync(apiConfigPath)) {
-        try {
-            const apiConfig = JSON.parse(fs.readFileSync(apiConfigPath));
-            backendHint = apiConfig.tunnelUrl || apiConfig.backendUrl;
-        } catch (e) {
-            console.log('⚠️ Could not read api_config.json');
-        }
-    }
-
-    // Create comprehensive snapshot
-    const snapshot = {
-        shop: {
-            name: shopInfo.name,
-            phone: shopInfo.phone || settings.phone || "+91 9876543210",
-            address: shopInfo.address || "",
-            lastUpdated: new Date().toISOString()
-        },
-        settings: {
-            gstRate: settings.gstRate || 18,
-            pointsRatio: settings.pointsRatio || 10,
-            currency: settings.currency || "₹"
-        },
-        offers: activeOffers,
-        products: publicProducts,
-        backendAvailabilityHint: backendHint
-    };
-
     // Write to root as products.json
-    fs.writeFileSync(STATIC_PRODUCT_FILE, JSON.stringify(snapshot, null, 2));
-    console.log(`✅ Synced ${publicProducts.length} products with ${activeOffers.length} active offers.`);
+    fs.writeFileSync(STATIC_PRODUCT_FILE, JSON.stringify(publicProducts, null, 2));
+    console.log(`✅ Synced ${publicProducts.length} products.`);
 
-    console.log('');
-    console.log('━'.repeat(50));
-    console.log('📊 Snapshot Summary:');
-    console.log(`   Products: ${publicProducts.length}`);
-    console.log(`   Active Offers: ${activeOffers.length}`);
-    console.log(`   GST Rate: ${snapshot.settings.gstRate}%`);
-    console.log(`   Points Ratio: ${snapshot.settings.pointsRatio}`);
-    console.log(`   Backend URL: ${snapshot.backendAvailabilityHint || 'Not set'}`);
-    console.log('━'.repeat(50));
-    console.log('');
-    console.log('✅ Snapshot generated successfully!');
-    console.log('🔒 Customer data NOT included (privacy protected)');
-    console.log('ℹ️  Customer data accessible via backend API only');
-    console.log('');
+    // ============================================
+    // 2. EXPORT CUSTOMER DATA (Login, Points, History)
+    // ============================================
+    const STATIC_CUSTOMER_FILE = path.join(__dirname, '../customers.json');
 
-    // Update HTML files with new version
-    console.log('🔄 Updating HTML files with version...');
-    const htmlFiles = ['retailer.html', 'customer.html'];
-    htmlFiles.forEach(file => {
-        const htmlPath = path.join(__dirname, '..', file);
-        if (fs.existsSync(htmlPath)) {
-            let html = fs.readFileSync(htmlPath, 'utf8');
-            // Replace version query params
-            html = html.replace(/\?v=\d+/g, `?v=${VERSION}`);
-            fs.writeFileSync(htmlPath, html);
-            console.log(`   ✅ Updated ${file}`);
-        }
-    });
-    console.log('');
+    if (db.customers) {
+        // We map the data to ensure we have a clean format
+        // Structure: { "9876543210": { name: "Raj", points: 100, history: [...] } }
+        const publicCustomers = {};
+
+        Object.keys(db.customers).forEach(mobile => {
+            const c = db.customers[mobile];
+            publicCustomers[mobile] = {
+                name: c.name,
+                mobile: c.mobile,
+                address: c.address,
+                points: c.points || 0,
+                wishlist: c.wishlist || [],
+                // We can include recent order history if available in the 'bills' section or customer object
+                // For now, syncing core identity and points
+            };
+        });
+
+        fs.writeFileSync(STATIC_CUSTOMER_FILE, JSON.stringify(publicCustomers, null, 2));
+        console.log(`✅ Synced ${Object.keys(publicCustomers).length} customers.`);
+    }
 
 } catch (error) {
     console.error('❌ Error executing sync:', error.message);

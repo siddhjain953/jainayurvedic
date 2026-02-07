@@ -4,10 +4,14 @@
   "description": "Device-wide data storage for Kirana Billing Platform",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node backend/server.js",
+    "dev": "node backend/server.js"
   },
-  "keywords": ["kirana", "billing", "retail"],
+  "keywords": [
+    "kirana",
+    "billing",
+    "retail"
+  ],
   "author": "",
   "license": "MIT"
 }
